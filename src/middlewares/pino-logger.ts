@@ -1,9 +1,9 @@
 import type { Logger, LoggerOptions } from "pino";
-import type { Options as PinoHttpOptions } from "pino-http";
+import type { HttpLogger, Options as PinoHttpOptions } from "pino-http";
 
 import { randomUUID } from "node:crypto";
 import pino from "pino";
-import pinoHttp from "pino-http";
+import pinoHttpImport from "pino-http";
 
 import { env } from "@/env.js";
 
@@ -38,7 +38,7 @@ export class LoggerService {
     return this.loggerInstance;
   }
 
-  createHttpLogger() {
+  createHttpLogger(): HttpLogger {
     const options: PinoHttpOptions = {
       logger: this.loggerInstance,
       genReqId: (req, res) => {
@@ -74,7 +74,7 @@ export class LoggerService {
       },
     };
 
-    return pinoHttp(options);
+    return (pinoHttpImport as unknown as (options: PinoHttpOptions) => HttpLogger)(options);
   }
 
   private buildTransport() {

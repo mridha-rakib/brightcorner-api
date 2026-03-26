@@ -1,5 +1,9 @@
-const fs = require("node:fs");
-const path = require("node:path");
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 function createModule(moduleName) {
   const modulePath = path.join(__dirname, "src", "modules", moduleName);
@@ -27,9 +31,7 @@ function createModule(moduleName) {
     fs.writeFileSync(filePath, "");
   });
 
-  console.log(
-    `Module "${moduleName}" has been created successfully with empty files.`
-  );
+  console.log(`Module "${moduleName}" has been created successfully with empty files.`);
 }
 
 const moduleName = process.argv[2];

@@ -2,6 +2,7 @@ import type { AddressInfo } from "node:net";
 
 import app from "@/app.js";
 import { bootstrapApplication } from "@/config/bootstrap.config.js";
+import { databaseConnector } from "@/config/database.config.js";
 import { env } from "@/env.js";
 import { logger } from "@/middlewares/pino-logger.js";
 
@@ -26,12 +27,13 @@ async function startServer() {
 
   const shutdown = (signal: NodeJS.Signals) => {
     logger.info(`${signal} received. Closing server.`);
-    server.close((closeError) => {
+    server.close(async (closeError) => {
       if (closeError) {
         logger.error({ err: closeError }, "Error while closing server");
         process.exit(1);
       }
 
+      await databaseConnector.disconnect();
       logger.info("Server closed.");
       process.exit(0);
     });

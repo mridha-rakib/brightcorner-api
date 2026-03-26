@@ -1,6 +1,6 @@
 import type { DatabaseConnector } from "@/config/database.config.js";
 
-import { NoopDatabaseConnector } from "@/config/database.config.js";
+import { databaseConnector as defaultDatabaseConnector } from "@/config/database.config.js";
 import { logger } from "@/middlewares/pino-logger.js";
 
 export type BootstrapDependencies = {
@@ -11,7 +11,7 @@ export class BootstrapConfig {
   private readonly databaseConnector: DatabaseConnector;
 
   constructor({ databaseConnector }: BootstrapDependencies = {}) {
-    this.databaseConnector = databaseConnector ?? new NoopDatabaseConnector();
+    this.databaseConnector = databaseConnector ?? defaultDatabaseConnector;
   }
 
   async run(): Promise<void> {
