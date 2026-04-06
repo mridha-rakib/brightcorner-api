@@ -28,3 +28,8 @@ export type CompleteOnboardingInput = {
 
 export type UpdatePrivacySettingsInput = Partial<UserPrivacySettings>;
 export type UpdateNotificationSettingsInput = Partial<UserNotificationSettings>;
+
+export type VerifyTwoFactorInput = {
+  code: string;
+  enabled: boolean;
+};

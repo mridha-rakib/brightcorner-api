@@ -1,4 +1,4 @@
-import { model, models, Schema } from "mongoose";
+import mongoose, { model, Schema } from "mongoose";
 
 import type { Conversation } from "@/modules/conversations/conversations.type.js";
 
@@ -41,4 +41,4 @@ const conversationSchema = new Schema<Conversation>({
 
 conversationSchema.index({ participantIds: 1 });
 
-export const ConversationModel = models.Conversation || model<Conversation>("Conversation", conversationSchema);
+export const ConversationModel = mongoose.models.Conversation || model<Conversation>("Conversation", conversationSchema);

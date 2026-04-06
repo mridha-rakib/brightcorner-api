@@ -1,4 +1,4 @@
-import { model, models, Schema } from "mongoose";
+import mongoose, { model, Schema } from "mongoose";
 
 import type { LegalContent } from "@/modules/legal-content/legal-content.type.js";
 
@@ -29,4 +29,4 @@ const legalContentSchema = new Schema<LegalContent>({
   versionKey: false,
 });
 
-export const LegalContentModel = models.LegalContent || model<LegalContent>("LegalContent", legalContentSchema);
+export const LegalContentModel = mongoose.models.LegalContent || model<LegalContent>("LegalContent", legalContentSchema);

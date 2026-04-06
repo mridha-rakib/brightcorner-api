@@ -26,6 +26,8 @@ export type UserNotificationSettings = {
   joinRequestAlerts: boolean;
 };
 
+export type TwoFactorDeliveryMethod = "email";
+
 export type User = {
   firstName: string;
   lastName: string;
@@ -39,6 +41,9 @@ export type User = {
   notificationSettings: UserNotificationSettings;
   onboardingCompleted: boolean;
   isTwoFactorEnabled: boolean;
+  twoFactorCodeExpiresAt: Date | null;
+  twoFactorCodeHash?: string;
+  twoFactorLastSentAt: Date | null;
   lastLoginAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
@@ -60,6 +65,14 @@ export type PublicUser = {
   lastLoginAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
+};
+
+export type TwoFactorSettings = {
+  deliveryLabel: string;
+  deliveryMethod: TwoFactorDeliveryMethod;
+  enabled: boolean;
+  expiresAt: Date | null;
+  lastSentAt: Date | null;
 };
 
 export type UserDocument = HydratedDocument<User>;

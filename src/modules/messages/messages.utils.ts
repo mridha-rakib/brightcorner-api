@@ -33,13 +33,30 @@ export function toMessageResponse(input: {
   sender: PublicUser;
 }): MessageResponse {
   return {
+    attachments: input.message.attachments?.map(attachment => ({ ...attachment })) ?? [],
     id: input.message.id,
     chatType: input.message.chatType,
     chatId: String(input.message.chatId),
-    text: input.message.text,
-    pinned: input.message.pinned,
     createdAt: input.message.createdAt,
+    pinned: input.message.pinned,
+    text: input.message.text,
     updatedAt: input.message.updatedAt,
     sender: input.sender,
   };
+}
+
+export function resolveMessagePreview(
+  message?: {
+    attachments?: Array<{ name: string }>;
+    text?: string | null;
+  } | null,
+): string | null {
+  const text = message?.text?.trim();
+  if (text)
+    return text;
+
+  if (message?.attachments?.length)
+    return `Shared ${message.attachments.length > 1 ? "attachments" : message.attachments[0].name}`;
+
+  return null;
 }

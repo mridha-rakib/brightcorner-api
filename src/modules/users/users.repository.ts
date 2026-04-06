@@ -21,6 +21,13 @@ export class UsersRepository extends BaseRepository<User> {
     return this.model.findById(id).select("+passwordHash").exec();
   }
 
+  findByIdWithTwoFactorState(id: string) {
+    return this.model
+      .findById(id)
+      .select("+twoFactorCodeHash +twoFactorCodeExpiresAt +twoFactorLastSentAt")
+      .exec();
+  }
+
   findActiveById(id: string) {
     return this.model.findOne({ _id: id, status: "active" }).exec();
   }

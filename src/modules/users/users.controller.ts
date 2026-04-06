@@ -11,6 +11,7 @@ import {
   onboardingSchema,
   privacySettingsUpdateSchema,
   profileUpdateSchema,
+  verifyTwoFactorSchema,
 } from "@/modules/users/users.schema.js";
 import { UsersService } from "@/modules/users/users.service.js";
 import { ApiResponse } from "@/utils/response.utils.js";
@@ -89,5 +90,30 @@ export class UsersController {
     const payload = await zParse(deleteAccountSchema, req);
     await this.usersService.deleteMyAccount(req.user!.id, payload.body.password);
     ApiResponse.noContent(res);
+  };
+
+  readonly getTwoFactorSettings = async (
+    req: AuthenticatedRequest,
+    res: Response,
+  ): Promise<void> => {
+    const settings = await this.usersService.getTwoFactorSettings(req.user!.id);
+    ApiResponse.success(res, settings, "Two-factor settings fetched successfully.");
+  };
+
+  readonly sendTwoFactorCode = async (
+    req: AuthenticatedRequest,
+    res: Response,
+  ): Promise<void> => {
+    const settings = await this.usersService.sendTwoFactorCode(req.user!.id);
+    ApiResponse.success(res, settings, "Verification code sent successfully.");
+  };
+
+  readonly verifyTwoFactor = async (
+    req: AuthenticatedRequest,
+    res: Response,
+  ): Promise<void> => {
+    const payload = await zParse(verifyTwoFactorSchema, req);
+    const user = await this.usersService.verifyTwoFactor(req.user!.id, payload.body);
+    ApiResponse.success(res, user, "Two-factor settings updated successfully.");
   };
 }

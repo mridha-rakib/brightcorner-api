@@ -1,7 +1,7 @@
 import type { DatabaseConnector } from "@/config/database.config.js";
 
 import { databaseConnector as defaultDatabaseConnector } from "@/config/database.config.js";
-import { logger } from "@/middlewares/pino-logger.js";
+import { logger } from "@/utils/logger.js";
 
 export type BootstrapDependencies = {
   databaseConnector?: DatabaseConnector;
@@ -15,9 +15,9 @@ export class BootstrapConfig {
   }
 
   async run(): Promise<void> {
-    logger.info("Starting application bootstrap.");
+    logger.info("Starting application bootstrap");
     await this.databaseConnector.connect();
-    logger.info("Application bootstrap completed.");
+    logger.info("Application bootstrap completed");
   }
 }
 

@@ -1,14 +1,15 @@
-import type { MessageChatType } from "@/modules/messages/messages.type.js";
+import type { MessageAttachment, MessageChatType } from "@/modules/messages/messages.type.js";
 
 import { MessageModel } from "@/modules/messages/messages.model.js";
 
 export class MessagesRepository {
   createMessage(payload: {
+    attachments: MessageAttachment[];
     chatType: MessageChatType;
     chatId: string;
+    pinned: boolean;
     senderId: string;
     text: string;
-    pinned: boolean;
   }) {
     return MessageModel.create(payload);
   }

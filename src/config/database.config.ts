@@ -1,7 +1,7 @@
 import mongoose from "mongoose";
 
 import { env } from "@/env.js";
-import { logger } from "@/middlewares/pino-logger.js";
+import { logger } from "@/utils/logger.js";
 
 export type DatabaseConnector = {
   connect: () => Promise<void>;
@@ -11,7 +11,7 @@ export type DatabaseConnector = {
 export class MongoDatabaseConnector implements DatabaseConnector {
   async connect(): Promise<void> {
     if (mongoose.connection.readyState === 1) {
-      logger.info("MongoDB connection already established.");
+      logger.info("MongoDB connection already established");
       return;
     }
 
@@ -19,7 +19,9 @@ export class MongoDatabaseConnector implements DatabaseConnector {
       dbName: env.MONGO_DB_NAME,
     });
 
-    logger.info("MongoDB connection established.");
+    logger.info("MongoDB connection established", {
+      databaseName: env.MONGO_DB_NAME,
+    });
   }
 
   async disconnect(): Promise<void> {
@@ -27,7 +29,7 @@ export class MongoDatabaseConnector implements DatabaseConnector {
       return;
 
     await mongoose.disconnect();
-    logger.info("MongoDB connection closed.");
+    logger.info("MongoDB connection closed");
   }
 }
 

@@ -21,6 +21,9 @@ class UsersRouter {
     this.router.patch("/me/notification-settings", this.controller.updateNotificationSettings);
     this.router.patch("/me/change-email", this.controller.changeEmail);
     this.router.patch("/me/change-password", this.controller.changePassword);
+    this.router.get("/me/two-factor", this.controller.getTwoFactorSettings);
+    this.router.post("/me/two-factor/send-code", this.controller.sendTwoFactorCode);
+    this.router.post("/me/two-factor/verify", this.controller.verifyTwoFactor);
     this.router.delete("/me", this.controller.deleteMyAccount);
   }
 }

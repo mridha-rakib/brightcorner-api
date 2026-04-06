@@ -1,4 +1,4 @@
-import { model, models, Schema } from "mongoose";
+import mongoose, { model, Schema } from "mongoose";
 
 import type { Channel, ChannelJoinRequest, ChannelMembership } from "@/modules/channels/channels.type.js";
 
@@ -133,6 +133,6 @@ const channelJoinRequestSchema = new Schema<ChannelJoinRequest>({
 
 channelJoinRequestSchema.index({ channelId: 1, userId: 1 }, { unique: true });
 
-export const ChannelModel = models.Channel || model<Channel>("Channel", channelSchema);
-export const ChannelMembershipModel = models.ChannelMembership || model<ChannelMembership>("ChannelMembership", channelMembershipSchema);
-export const ChannelJoinRequestModel = models.ChannelJoinRequest || model<ChannelJoinRequest>("ChannelJoinRequest", channelJoinRequestSchema);
+export const ChannelModel = mongoose.models.Channel || model<Channel>("Channel", channelSchema);
+export const ChannelMembershipModel = mongoose.models.ChannelMembership || model<ChannelMembership>("ChannelMembership", channelMembershipSchema);
+export const ChannelJoinRequestModel = mongoose.models.ChannelJoinRequest || model<ChannelJoinRequest>("ChannelJoinRequest", channelJoinRequestSchema);

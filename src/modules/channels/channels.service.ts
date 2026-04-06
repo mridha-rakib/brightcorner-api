@@ -18,6 +18,8 @@ import {
   toChannelSummary,
 } from "@/modules/channels/channels.utils.js";
 import { MessagesRepository } from "@/modules/messages/messages.repository.js";
+import { resolveMessagePreview } from "@/modules/messages/messages.utils.js";
+import { NotificationsService } from "@/modules/notifications/notifications.service.js";
 import { UsersRepository } from "@/modules/users/users.repository.js";
 import { toPublicUser } from "@/modules/users/users.utils.js";
 import {
@@ -38,6 +40,7 @@ export class ChannelsService {
     private readonly channelsRepository: ChannelsRepository = new ChannelsRepository(),
     private readonly usersRepository: UsersRepository = new UsersRepository(),
     private readonly messagesRepository: MessagesRepository = new MessagesRepository(),
+    private readonly notificationsService: NotificationsService = new NotificationsService(),
   ) {}
 
   async listChannels(userId: string, input: ListChannelsInput): Promise<ChannelSummary[]> {
@@ -152,6 +155,10 @@ export class ChannelsService {
       reason: input.reason?.trim(),
     });
     await this.channelsRepository.touchChannel(channelId);
+    await this.notificationsService.notifyPrivateChannelJoinRequest({
+      channelId,
+      requesterId: userId,
+    });
 
     return this.getChannelById(userId, channel.id);
   }
@@ -277,7 +284,7 @@ export class ChannelsService {
       joinRequest: input.joinRequest ?? null,
       members,
       totalAdmins,
-      lastMessage: lastMessage?.text ?? null,
+      lastMessage: resolveMessagePreview(lastMessage),
       lastMessageAt: lastMessage?.createdAt ?? null,
     });
   }

@@ -8,6 +8,8 @@ import channelsRouter from "@/modules/channels/channels.route.js";
 import conversationsRouter from "@/modules/conversations/conversations.route.js";
 import legalContentRouter from "@/modules/legal-content/legal-content.route.js";
 import messagesRouter from "@/modules/messages/messages.route.js";
+import notificationsRouter from "@/modules/notifications/notifications.route.js";
+import supportRequestsRouter from "@/modules/support-requests/support-requests.route.js";
 import usersRouter from "@/modules/users/users.route.js";
 import { ApiResponse } from "@/utils/response.utils.js";
 
@@ -28,6 +30,8 @@ class RootRouter {
     this.router.use("/users", usersRouter);
     this.router.use("/legal-content", legalContentRouter);
     this.router.use("/messages", messagesRouter);
+    this.router.use("/notifications", notificationsRouter);
+    this.router.use("/support-requests", supportRequestsRouter);
   }
 
   private readonly getBaseRoute = (_req: Request, res: Response): void => {

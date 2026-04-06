@@ -5,8 +5,8 @@ import { ZodError } from "zod/v4";
 import { HTTPSTATUS } from "@/config/http.config.js";
 import { ErrorCodeEnum } from "@/enums/error-code.enum.js";
 import { env } from "@/env.js";
-import { logger } from "@/middlewares/pino-logger.js";
 import { AppError } from "@/utils/app-error.utils.js";
+import { logger } from "@/utils/logger.js";
 
 type ErrorPayload = {
   success: false;
@@ -22,6 +22,27 @@ type ErrorPayload = {
   stack?: string;
 };
 
+type RequestParsingError = Error & {
+  type?: string;
+  status?: number;
+  statusCode?: number;
+  limit?: number;
+  length?: number;
+};
+
+function isPayloadTooLargeError(error: unknown): error is RequestParsingError {
+  return error instanceof Error
+    && (
+      (error as RequestParsingError).type === "entity.too.large"
+      || error.name === "PayloadTooLargeError"
+    );
+}
+
+function isInvalidRequestFormatError(error: unknown): error is RequestParsingError {
+  return error instanceof Error
+    && (error as RequestParsingError).type === "entity.parse.failed";
+}
+
 function buildErrorPayload(
   req: Request,
   statusCode: number,
@@ -30,7 +51,7 @@ function buildErrorPayload(
   details?: unknown,
   stack?: string,
 ): ErrorPayload {
-  const requestId = (req as { id?: string }).id;
+  const requestId = req.requestId ?? req.id;
 
   return {
     success: false,
@@ -55,6 +76,49 @@ export function errorHandler(
 ): void {
   if (res.headersSent)
     return;
+
+  if (isPayloadTooLargeError(err)) {
+    logger.warn("Request payload too large", {
+      path: req.originalUrl,
+      requestId: req.requestId,
+      limit: err.limit,
+      length: err.length,
+    });
+
+    const payload = buildErrorPayload(
+      req,
+      HTTPSTATUS.PAYLOAD_TOO_LARGE,
+      ErrorCodeEnum.REQUEST_TOO_LARGE,
+      "Request payload is too large.",
+      err.limit
+        ? [{ path: "body", message: `Payload exceeds the configured limit of ${err.limit} bytes.` }]
+        : undefined,
+      env.NODE_ENV === "production" ? undefined : err.stack,
+    );
+
+    res.status(HTTPSTATUS.PAYLOAD_TOO_LARGE).json(payload);
+    return;
+  }
+
+  if (isInvalidRequestFormatError(err)) {
+    logger.warn("Invalid request payload format", {
+      path: req.originalUrl,
+      requestId: req.requestId,
+      error: err.message,
+    });
+
+    const payload = buildErrorPayload(
+      req,
+      HTTPSTATUS.BAD_REQUEST,
+      ErrorCodeEnum.INVALID_REQUEST_FORMAT,
+      "Invalid request payload format.",
+      undefined,
+      env.NODE_ENV === "production" ? undefined : err.stack,
+    );
+
+    res.status(HTTPSTATUS.BAD_REQUEST).json(payload);
+    return;
+  }
 
   if (err instanceof ZodError) {
     const payload = buildErrorPayload(
@@ -81,7 +145,11 @@ export function errorHandler(
     );
 
     if (err.statusCode >= HTTPSTATUS.INTERNAL_SERVER_ERROR) {
-      logger.error({ err, path: req.originalUrl }, "Unhandled application error");
+      logger.error("Unhandled application error", {
+        error: err,
+        path: req.originalUrl,
+        requestId: req.requestId,
+      });
     }
 
     res.status(err.statusCode).json(payload);
@@ -89,7 +157,11 @@ export function errorHandler(
   }
 
   const unknownError = err instanceof Error ? err : new Error("Unknown error");
-  logger.error({ err: unknownError, path: req.originalUrl }, "Unhandled server error");
+  logger.error("Unhandled server error", {
+    error: unknownError,
+    path: req.originalUrl,
+    requestId: req.requestId,
+  });
 
   const payload = buildErrorPayload(
     req,

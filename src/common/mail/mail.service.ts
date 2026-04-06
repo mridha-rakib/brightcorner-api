@@ -3,7 +3,7 @@ import nodemailer from "nodemailer";
 import type { MailMessage, MailProvider } from "@/common/mail/mail.types.js";
 
 import { env } from "@/env.js";
-import { logger } from "@/middlewares/pino-logger.js";
+import { logger } from "@/utils/logger.js";
 
 type PasswordResetMailInput = {
   to: string;
@@ -11,9 +11,18 @@ type PasswordResetMailInput = {
   resetToken: string;
 };
 
+type TwoFactorCodeMailInput = {
+  to: string;
+  firstName: string;
+  code: string;
+};
+
 class StubMailProvider implements MailProvider {
   async send(message: MailMessage): Promise<void> {
-    logger.info({ message }, "Stub mail provider intercepted outgoing email.");
+    logger.info("Stub mail provider intercepted outgoing email", {
+      recipient: message.to,
+      subject: message.subject,
+    });
   }
 }
 
@@ -86,6 +95,27 @@ export class MailService {
         "<p>We received a request to reset your password.</p>",
         `<p><a href="${resetUrl}">Reset your password</a></p>`,
         "<p>If you did not request this change, you can ignore this email.</p>",
+      ].join(""),
+    });
+  }
+
+  async sendTwoFactorCodeEmail(input: TwoFactorCodeMailInput): Promise<void> {
+    await this.provider.send({
+      to: input.to,
+      subject: "Your Bright Corner verification code",
+      text: [
+        `Hello ${input.firstName},`,
+        "",
+        `Your Bright Corner verification code is ${input.code}.`,
+        "This code will expire in 10 minutes.",
+        "",
+        "If you did not request this code, you can ignore this email.",
+      ].join("\n"),
+      html: [
+        `<p>Hello ${input.firstName},</p>`,
+        `<p>Your Bright Corner verification code is <strong>${input.code}</strong>.</p>`,
+        "<p>This code will expire in 10 minutes.</p>",
+        "<p>If you did not request this code, you can ignore this email.</p>",
       ].join(""),
     });
   }

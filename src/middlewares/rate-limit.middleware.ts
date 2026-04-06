@@ -5,7 +5,7 @@ import rateLimit from "express-rate-limit";
 import { HTTPSTATUS } from "@/config/http.config.js";
 import { ErrorCodeEnum } from "@/enums/error-code.enum.js";
 import { env } from "@/env.js";
-import { logger } from "@/middlewares/pino-logger.js";
+import { logger } from "@/utils/logger.js";
 
 export type RateLimitOptions = {
   windowMs?: number;
@@ -29,14 +29,12 @@ export class RateLimitMiddlewareFactory {
       legacyHeaders: false,
       skip: _request => env.NODE_ENV === "test",
       handler: (request: Request, response: Response) => {
-        logger.warn(
-          {
-            ip: request.ip,
-            method: request.method,
-            path: request.originalUrl,
-          },
-          "Rate limit exceeded",
-        );
+        logger.warn("Rate limit exceeded", {
+          requestId: request.requestId,
+          ip: request.ip,
+          method: request.method,
+          path: request.originalUrl,
+        });
 
         response.status(HTTPSTATUS.TOO_MANY_REQUESTS).json({
           success: false,
@@ -46,6 +44,7 @@ export class RateLimitMiddlewareFactory {
             statusCode: HTTPSTATUS.TOO_MANY_REQUESTS,
           },
           timestamp: new Date().toISOString(),
+          ...(request.requestId ? { requestId: request.requestId } : {}),
         });
       },
     });

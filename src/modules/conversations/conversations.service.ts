@@ -17,6 +17,7 @@ import {
   toConversationSummary,
 } from "@/modules/conversations/conversations.utils.js";
 import { MessagesRepository } from "@/modules/messages/messages.repository.js";
+import { resolveMessagePreview } from "@/modules/messages/messages.utils.js";
 import { UsersRepository } from "@/modules/users/users.repository.js";
 import { toPublicUser } from "@/modules/users/users.utils.js";
 import { BadRequestException, ForbiddenException, NotFoundException } from "@/utils/app-error.utils.js";
@@ -154,7 +155,7 @@ export class ConversationsService {
     return toConversationSummary({
       conversation,
       participant,
-      lastMessage: lastMessage?.text ?? null,
+      lastMessage: resolveMessagePreview(lastMessage),
       lastMessageAt: lastMessage?.createdAt ?? null,
     });
   }

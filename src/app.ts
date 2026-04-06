@@ -10,7 +10,7 @@ import { swaggerSpec, swaggerUi, swaggerUiOptions } from "@/config/swagger.confi
 import { env } from "@/env.js";
 import { errorHandler } from "@/middlewares/error-handler.middleware.js";
 import { notFound } from "@/middlewares/not-found.middleware.js";
-import { pinoLogger } from "@/middlewares/pino-logger.js";
+import { createRequestLoggerMiddleware } from "@/middlewares/request-logger.middleware.js";
 import { globalRateLimit } from "@/middlewares/rate-limit.middleware.js";
 import rootRouter from "@/routes/index.route.js";
 
@@ -23,9 +23,9 @@ class ApplicationFactory {
 
   create(): Application {
     this.configureProxy();
+    this.configureObservability();
     this.configureSecurity();
     this.configureParsers();
-    this.configureObservability();
     this.configureRoutes();
     this.configureErrorHandling();
 
@@ -67,8 +67,11 @@ class ApplicationFactory {
   }
 
   private configureObservability(): void {
-    if (env.ENABLE_REQUEST_LOGGING)
-      this.app.use(pinoLogger());
+    this.app.use(
+      createRequestLoggerMiddleware({
+        enableLogging: env.ENABLE_REQUEST_LOGGING,
+      }),
+    );
   }
 
   private configureRoutes(): void {

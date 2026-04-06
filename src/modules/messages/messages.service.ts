@@ -10,6 +10,7 @@ import { ChannelsRepository } from "@/modules/channels/channels.repository.js";
 import { ConversationsRepository } from "@/modules/conversations/conversations.repository.js";
 import { MessagesRepository } from "@/modules/messages/messages.repository.js";
 import { resolveMessageTarget, toMessageResponse } from "@/modules/messages/messages.utils.js";
+import { NotificationsService } from "@/modules/notifications/notifications.service.js";
 import { UsersRepository } from "@/modules/users/users.repository.js";
 import { toPublicUser } from "@/modules/users/users.utils.js";
 import { ForbiddenException, NotFoundException } from "@/utils/app-error.utils.js";
@@ -20,6 +21,7 @@ export class MessagesService {
     private readonly usersRepository: UsersRepository = new UsersRepository(),
     private readonly channelsRepository: ChannelsRepository = new ChannelsRepository(),
     private readonly conversationsRepository: ConversationsRepository = new ConversationsRepository(),
+    private readonly notificationsService: NotificationsService = new NotificationsService(),
   ) {}
 
   async listMessages(userId: string, input: ListMessagesInput): Promise<MessageResponse[]> {
@@ -40,17 +42,26 @@ export class MessagesService {
       throw new NotFoundException("User not found.");
 
     const message = await this.messagesRepository.createMessage({
+      attachments: input.attachments ?? [],
       chatType: chat.chatType,
       chatId: chat.chatId,
-      senderId: userId,
-      text: input.text.trim(),
       pinned: input.pinned ?? false,
+      senderId: userId,
+      text: input.text?.trim() ?? "",
     });
 
     if (chat.chatType === "channel")
       await this.channelsRepository.touchChannel(chat.chatId);
     else
       await this.conversationsRepository.touchConversation(chat.chatId);
+
+    await this.notificationsService.notifyMessageCreated({
+      attachmentsCount: input.attachments?.length ?? 0,
+      chatId: chat.chatId,
+      chatType: chat.chatType,
+      senderId: userId,
+      text: input.text?.trim() ?? "",
+    });
 
     return toMessageResponse({
       message,

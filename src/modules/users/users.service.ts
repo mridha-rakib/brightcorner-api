@@ -1,13 +1,17 @@
+import { createHash, randomInt } from "node:crypto";
+
 import type {
   CompleteOnboardingInput,
   CreateUserInput,
   UpdateNotificationSettingsInput,
   UpdatePrivacySettingsInput,
   UpdateUserProfileInput,
+  VerifyTwoFactorInput,
 } from "@/modules/users/users.interface.js";
-import type { PublicUser, UserDocument } from "@/modules/users/users.type.js";
+import type { PublicUser, TwoFactorSettings, UserDocument } from "@/modules/users/users.type.js";
 
 import { PasswordService } from "@/common/auth/password.service.js";
+import { MailService } from "@/common/mail/mail.service.js";
 import { HTTPSTATUS } from "@/config/http.config.js";
 import { ErrorCodeEnum } from "@/enums/error-code.enum.js";
 import { UsersRepository } from "@/modules/users/users.repository.js";
@@ -15,6 +19,7 @@ import {
   buildFullName,
   normalizeEmail,
   normalizeUsername,
+  toTwoFactorSettings,
   toPublicUser,
 } from "@/modules/users/users.utils.js";
 import { AppError, BadRequestException, NotFoundException } from "@/utils/app-error.utils.js";
@@ -23,6 +28,7 @@ export class UsersService {
   constructor(
     private readonly usersRepository: UsersRepository = new UsersRepository(),
     private readonly passwordService: PasswordService = new PasswordService(),
+    private readonly mailService: MailService = new MailService(),
   ) {}
 
   async createUser(input: CreateUserInput): Promise<PublicUser> {
@@ -215,6 +221,61 @@ export class UsersService {
     await user.deleteOne();
   }
 
+  async getTwoFactorSettings(userId: string): Promise<TwoFactorSettings> {
+    const user = await this.getUserDocument(userId);
+    return toTwoFactorSettings(user);
+  }
+
+  async sendTwoFactorCode(userId: string): Promise<TwoFactorSettings> {
+    const user = await this.getUserWithTwoFactorState(userId);
+    const now = Date.now();
+    const lastSentAt = user.twoFactorLastSentAt?.getTime() ?? 0;
+
+    if (lastSentAt && now - lastSentAt < 30_000) {
+      throw new BadRequestException("Please wait a few seconds before requesting another code.");
+    }
+
+    const code = randomInt(100000, 1000000).toString();
+    user.twoFactorCodeHash = this.hashTwoFactorCode(code);
+    user.twoFactorCodeExpiresAt = new Date(now + 10 * 60 * 1000);
+    user.twoFactorLastSentAt = new Date(now);
+    await user.save();
+
+    await this.mailService.sendTwoFactorCodeEmail({
+      code,
+      firstName: user.firstName,
+      to: user.email,
+    });
+
+    return toTwoFactorSettings(user);
+  }
+
+  async verifyTwoFactor(userId: string, input: VerifyTwoFactorInput): Promise<PublicUser> {
+    const user = await this.getUserWithTwoFactorState(userId);
+    const codeHash = user.twoFactorCodeHash;
+    const expiresAt = user.twoFactorCodeExpiresAt;
+
+    if (!codeHash || !expiresAt)
+      throw new BadRequestException("Request a verification code before continuing.");
+
+    if (expiresAt.getTime() < Date.now()) {
+      user.twoFactorCodeHash = undefined;
+      user.twoFactorCodeExpiresAt = null;
+      await user.save();
+      throw new BadRequestException("Your verification code has expired. Request a new code.");
+    }
+
+    if (codeHash !== this.hashTwoFactorCode(input.code))
+      throw new BadRequestException("The verification code is invalid.");
+
+    user.isTwoFactorEnabled = input.enabled;
+    user.twoFactorCodeHash = undefined;
+    user.twoFactorCodeExpiresAt = null;
+    await user.save();
+
+    return toPublicUser(user);
+  }
+
   async markLastLogin(userId: string): Promise<void> {
     const user = await this.getUserDocument(userId);
     user.lastLoginAt = new Date();
@@ -227,5 +288,17 @@ export class UsersService {
       throw new NotFoundException("User not found.");
 
     return user;
+  }
+
+  private async getUserWithTwoFactorState(userId: string): Promise<UserDocument> {
+    const user = await this.usersRepository.findByIdWithTwoFactorState(userId);
+    if (!user)
+      throw new NotFoundException("User not found.");
+
+    return user;
+  }
+
+  private hashTwoFactorCode(code: string): string {
+    return createHash("sha256").update(code).digest("hex");
   }
 }

@@ -7,6 +7,14 @@ const usernameSchema = z
   .max(30)
   .regex(/^[\w-]+$/, "Username can only include letters, numbers, underscores, and hyphens");
 
+const avatarValueSchema = z.union([
+  z.string().trim().max(2048),
+  z.string().trim().regex(
+    /^data:image\/[a-zA-Z0-9.+-]+;base64,/,
+    "Avatar must be a valid image data URL.",
+  ).max(900000),
+]);
+
 const privacySettingsSchema = z.object({
   messagePreference: z.enum(["everyone", "contacts", "nobody"]).optional(),
   anonymousMode: z.boolean().optional(),
@@ -33,7 +41,7 @@ export const onboardingSchema = z.object({
   body: z.object({
     username: usernameSchema,
     bio: z.string().trim().max(1600).optional(),
-    avatarUrl: z.string().trim().max(2048).optional(),
+    avatarUrl: avatarValueSchema.optional(),
     privacySettings: privacySettingsSchema.optional(),
     notificationSettings: notificationSettingsSchema.optional(),
   }),
@@ -51,7 +59,7 @@ export const profileUpdateSchema = z.object({
     lastName: z.string().trim().min(1).max(80).optional(),
     username: usernameSchema.optional(),
     bio: z.string().trim().max(1600).optional(),
-    avatarUrl: z.string().trim().max(2048).optional(),
+    avatarUrl: avatarValueSchema.optional(),
   }),
 });
 
@@ -90,5 +98,12 @@ export const changePasswordSchema = z.object({
 export const deleteAccountSchema = z.object({
   body: z.object({
     password: z.string().min(1),
+  }),
+});
+
+export const verifyTwoFactorSchema = z.object({
+  body: z.object({
+    code: z.string().trim().regex(/^\d{6}$/, "Verification code must be 6 digits."),
+    enabled: z.boolean(),
   }),
 });

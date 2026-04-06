@@ -1,4 +1,4 @@
-import { model, models, Schema } from "mongoose";
+import mongoose, { model, Schema } from "mongoose";
 
 import type { User } from "@/modules/users/users.type.js";
 
@@ -132,6 +132,21 @@ const userSchema = new Schema<User>({
     type: Boolean,
     default: false,
   },
+  twoFactorCodeHash: {
+    type: String,
+    trim: true,
+    select: false,
+  },
+  twoFactorCodeExpiresAt: {
+    type: Date,
+    default: null,
+    select: false,
+  },
+  twoFactorLastSentAt: {
+    type: Date,
+    default: null,
+    select: false,
+  },
   lastLoginAt: {
     type: Date,
     default: null,
@@ -143,4 +158,4 @@ const userSchema = new Schema<User>({
 
 userSchema.index({ "profile.username": 1 }, { unique: true, sparse: true });
 
-export const UserModel = models.User || model<User>("User", userSchema);
+export const UserModel = mongoose.models.User || model<User>("User", userSchema);

@@ -1,8 +1,47 @@
-import { model, models, Schema } from "mongoose";
+import mongoose, { model, Schema } from "mongoose";
 
-import type { Message } from "@/modules/messages/messages.type.js";
+import type { Message, MessageAttachment } from "@/modules/messages/messages.type.js";
+
+const attachmentSchema = new Schema<MessageAttachment>({
+  id: {
+    type: String,
+    required: true,
+    trim: true,
+  },
+  name: {
+    type: String,
+    required: true,
+    trim: true,
+    maxlength: 255,
+  },
+  mimeType: {
+    type: String,
+    required: true,
+    trim: true,
+    maxlength: 128,
+  },
+  size: {
+    type: Number,
+    required: true,
+    min: 1,
+    max: 2 * 1024 * 1024,
+  },
+  url: {
+    type: String,
+    required: true,
+    trim: true,
+    maxlength: 3_000_000,
+  },
+}, {
+  _id: false,
+  versionKey: false,
+});
 
 const messageSchema = new Schema<Message>({
+  attachments: {
+    type: [attachmentSchema],
+    default: [],
+  },
   chatType: {
     type: String,
     required: true,
@@ -22,8 +61,8 @@ const messageSchema = new Schema<Message>({
   },
   text: {
     type: String,
-    required: true,
     trim: true,
+    default: "",
     maxlength: 4000,
   },
   pinned: {
@@ -38,4 +77,4 @@ const messageSchema = new Schema<Message>({
 messageSchema.index({ chatType: 1, chatId: 1, createdAt: -1 });
 messageSchema.index({ chatType: 1, chatId: 1, pinned: 1, createdAt: -1 });
 
-export const MessageModel = models.Message || model<Message>("Message", messageSchema);
+export const MessageModel = mongoose.models.Message || model<Message>("Message", messageSchema);

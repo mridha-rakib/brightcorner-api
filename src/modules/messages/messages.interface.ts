@@ -1,3 +1,5 @@
+import type { MessageAttachment } from "@/modules/messages/messages.type.js";
+
 export type ListMessagesInput = {
   channelId?: string;
   conversationId?: string;
@@ -5,8 +7,9 @@ export type ListMessagesInput = {
 };
 
 export type CreateMessageInput = {
+  attachments?: MessageAttachment[];
   channelId?: string;
   conversationId?: string;
-  text: string;
   pinned?: boolean;
+  text?: string;
 };

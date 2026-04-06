@@ -1,4 +1,10 @@
-import type { PublicUser, UserDocument, UserNotificationSettings, UserPrivacySettings } from "@/modules/users/users.type.js";
+import type {
+  PublicUser,
+  TwoFactorSettings,
+  UserDocument,
+  UserNotificationSettings,
+  UserPrivacySettings,
+} from "@/modules/users/users.type.js";
 
 export const DEFAULT_PRIVACY_SETTINGS: UserPrivacySettings = {
   messagePreference: "everyone",
@@ -25,6 +31,27 @@ export function normalizeEmail(email: string): string {
 
 export function normalizeUsername(username: string): string {
   return username.trim().toLowerCase().replace(/\s+/g, "_");
+}
+
+export function maskEmailAddress(email: string): string {
+  const [localPart, domain] = email.split("@");
+  if (!localPart || !domain)
+    return email;
+
+  if (localPart.length <= 2)
+    return `${localPart[0] ?? "*"}***@${domain}`;
+
+  return `${localPart.slice(0, 2)}***@${domain}`;
+}
+
+export function toTwoFactorSettings(user: UserDocument): TwoFactorSettings {
+  return {
+    deliveryLabel: maskEmailAddress(user.email),
+    deliveryMethod: "email",
+    enabled: user.isTwoFactorEnabled,
+    expiresAt: user.twoFactorCodeExpiresAt ?? null,
+    lastSentAt: user.twoFactorLastSentAt ?? null,
+  };
 }
 
 export function toPublicUser(user: UserDocument): PublicUser {

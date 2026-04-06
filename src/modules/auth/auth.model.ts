@@ -1,4 +1,4 @@
-import { model, models, Schema } from "mongoose";
+import mongoose, { model, Schema } from "mongoose";
 
 import type { AuthSession, PasswordResetToken } from "@/modules/auth/auth.type.js";
 
@@ -30,7 +30,6 @@ const authSessionSchema = new Schema<AuthSession>({
   expiresAt: {
     type: Date,
     required: true,
-    index: true,
   },
   revokedAt: {
     type: Date,
@@ -59,7 +58,6 @@ const passwordResetTokenSchema = new Schema<PasswordResetToken>({
   expiresAt: {
     type: Date,
     required: true,
-    index: true,
   },
   consumedAt: {
     type: Date,
@@ -72,5 +70,5 @@ const passwordResetTokenSchema = new Schema<PasswordResetToken>({
 
 passwordResetTokenSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
 
-export const AuthSessionModel = models.AuthSession || model<AuthSession>("AuthSession", authSessionSchema);
-export const PasswordResetTokenModel = models.PasswordResetToken || model<PasswordResetToken>("PasswordResetToken", passwordResetTokenSchema);
+export const AuthSessionModel = mongoose.models.AuthSession || model<AuthSession>("AuthSession", authSessionSchema);
+export const PasswordResetTokenModel = mongoose.models.PasswordResetToken || model<PasswordResetToken>("PasswordResetToken", passwordResetTokenSchema);
