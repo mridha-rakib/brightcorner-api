@@ -19,6 +19,7 @@ export type ConversationSummary = {
   avatarUrl?: string;
   isEncrypted: true;
   isPinProtected: boolean;
+  isLocked: boolean;
   unread: number;
   lastMessage: string | null;
   lastMessageAt: Date | null;
@@ -26,5 +27,10 @@ export type ConversationSummary = {
 };
 
 export type ConversationDetail = ConversationSummary;
+
+export type ConversationUnlockResponse = {
+  conversation: ConversationDetail;
+  unlockToken: string;
+};
 
 export type ConversationDocument = HydratedDocument<Conversation>;

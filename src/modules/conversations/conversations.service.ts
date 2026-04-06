@@ -1,15 +1,18 @@
 import type {
   CreateDirectConversationInput,
   ListConversationsInput,
+  UnlockProtectedConversationInput,
 } from "@/modules/conversations/conversations.interface.js";
 import type {
   ConversationDetail,
   ConversationDocument,
   ConversationSummary,
+  ConversationUnlockResponse,
 } from "@/modules/conversations/conversations.type.js";
 import type { PublicUser } from "@/modules/users/users.type.js";
 
 import { PasswordService } from "@/common/auth/password.service.js";
+import { ProtectedConversationAccessService } from "@/modules/conversations/protected-conversation-access.service.js";
 import { ConversationsRepository } from "@/modules/conversations/conversations.repository.js";
 import {
   buildConversationParticipantKey,
@@ -29,6 +32,7 @@ export class ConversationsService {
     private readonly usersRepository: UsersRepository = new UsersRepository(),
     private readonly messagesRepository: MessagesRepository = new MessagesRepository(),
     private readonly messageReadStateRepository: MessageReadStateRepository = new MessageReadStateRepository(),
+    private readonly protectedConversationAccessService: ProtectedConversationAccessService = new ProtectedConversationAccessService(),
     private readonly passwordService: PasswordService = new PasswordService(),
   ) {}
 
@@ -76,6 +80,7 @@ export class ConversationsService {
           participant,
           userId,
           readStateMap.get(conversation.id) ?? null,
+          false,
         );
       }),
     );
@@ -118,7 +123,11 @@ export class ConversationsService {
     return this.getConversationById(currentUserId, createdConversation.id);
   }
 
-  async getConversationById(userId: string, conversationId: string): Promise<ConversationDetail> {
+  async getConversationById(
+    userId: string,
+    conversationId: string,
+    unlockToken?: string,
+  ): Promise<ConversationDetail> {
     const conversation = await this.ensureConversationParticipant(userId, conversationId);
     const otherParticipantId = getOtherParticipantId(conversation, userId);
     const [participant, readState] = await Promise.all([
@@ -132,19 +141,75 @@ export class ConversationsService {
     if (!participant)
       throw new NotFoundException("Conversation participant not found.");
 
+    const isUnlocked = this.isConversationUnlockedForUser(conversation, userId, unlockToken);
+
     return this.buildConversationSummary(
       conversation,
       toPublicUser(participant),
       userId,
       readState,
+      isUnlocked,
     );
+  }
+
+  async unlockProtectedConversation(
+    userId: string,
+    conversationId: string,
+    input: UnlockProtectedConversationInput,
+  ): Promise<ConversationUnlockResponse> {
+    const conversation = await this.ensureConversationParticipant(userId, conversationId, true);
+    if (!conversation.pinProtected || !conversation.accessPinHash)
+      throw new BadRequestException("This conversation does not require a PIN.");
+
+    const isValidPin = await this.passwordService.compare(input.pin, conversation.accessPinHash);
+    if (!isValidPin)
+      throw new ForbiddenException("Incorrect PIN for this conversation.");
+
+    const unlockToken = this.protectedConversationAccessService.issueAccessToken({
+      conversationId,
+      userId,
+    });
+
+    return {
+      conversation: await this.getConversationById(userId, conversationId, unlockToken),
+      unlockToken,
+    };
+  }
+
+  async lockProtectedConversation(
+    userId: string,
+    conversationId: string,
+    unlockToken?: string,
+  ): Promise<ConversationDetail> {
+    await this.ensureConversationParticipant(userId, conversationId);
+    this.protectedConversationAccessService.revokeAccessToken(unlockToken);
+
+    return this.getConversationById(userId, conversationId);
+  }
+
+  isConversationUnlockedForUser(
+    conversation: ConversationDocument,
+    userId: string,
+    unlockToken?: string,
+  ): boolean {
+    if (!conversation.pinProtected)
+      return true;
+
+    return this.protectedConversationAccessService.validateAccessToken({
+      conversationId: conversation.id,
+      token: unlockToken,
+      userId,
+    });
   }
 
   async ensureConversationParticipant(
     userId: string,
     conversationId: string,
+    includeAccessPin = false,
   ): Promise<ConversationDocument> {
-    const conversation = await this.conversationsRepository.findById(conversationId);
+    const conversation = includeAccessPin
+      ? await this.conversationsRepository.findByIdWithAccessPin(conversationId)
+      : await this.conversationsRepository.findById(conversationId);
     if (!conversation)
       throw new NotFoundException("Conversation not found.");
 
@@ -175,6 +240,7 @@ export class ConversationsService {
     participant: PublicUser,
     userId: string,
     readState: Awaited<ReturnType<MessageReadStateRepository["listForUser"]>>[number] | null,
+    isUnlocked: boolean,
   ): Promise<ConversationSummary> {
     const [lastMessage, unread] = await Promise.all([
       this.messagesRepository.findLatestMessage({
@@ -188,12 +254,14 @@ export class ConversationsService {
         userId,
       }),
     ]);
+    const isLocked = conversation.pinProtected && !isUnlocked;
 
     return toConversationSummary({
       conversation,
+      isLocked,
       participant,
       unread,
-      lastMessage: resolveMessagePreview(lastMessage),
+      lastMessage: isLocked ? "PIN protected conversation" : resolveMessagePreview(lastMessage),
       lastMessageAt: lastMessage?.createdAt ?? null,
     });
   }

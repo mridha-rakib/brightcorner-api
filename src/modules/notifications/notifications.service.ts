@@ -75,7 +75,9 @@ export class NotificationsService {
         actorName: sender.fullName,
         chatId: input.chatId,
         chatType: "conversation",
-        content: this.buildDirectMessageContent(input.text, input.attachmentsCount),
+        content: conversation.pinProtected
+          ? this.buildProtectedDirectMessageContent(input.attachmentsCount)
+          : this.buildDirectMessageContent(input.text, input.attachmentsCount),
         type: "message",
         userId: recipientId,
       }]);
@@ -242,6 +244,13 @@ export class NotificationsService {
       return "sent you a direct attachment.";
 
     return "sent you a direct message.";
+  }
+
+  private buildProtectedDirectMessageContent(attachmentsCount: number): string {
+    if (attachmentsCount > 0)
+      return "sent you a PIN-protected attachment.";
+
+    return "sent you a PIN-protected direct message.";
   }
 
   private buildChannelMessageContent(

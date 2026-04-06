@@ -14,6 +14,7 @@ import type {
 import type { PublicUser } from "@/modules/users/users.type.js";
 
 import { ChannelsRepository } from "@/modules/channels/channels.repository.js";
+import { ProtectedConversationAccessService } from "@/modules/conversations/protected-conversation-access.service.js";
 import { ConversationsRepository } from "@/modules/conversations/conversations.repository.js";
 import { MessageReadStateRepository } from "@/modules/messages/message-read-state.repository.js";
 import { MessagesRepository } from "@/modules/messages/messages.repository.js";
@@ -38,6 +39,7 @@ export class MessagesService {
     private readonly usersRepository: UsersRepository = new UsersRepository(),
     private readonly channelsRepository: ChannelsRepository = new ChannelsRepository(),
     private readonly conversationsRepository: ConversationsRepository = new ConversationsRepository(),
+    private readonly protectedConversationAccessService: ProtectedConversationAccessService = new ProtectedConversationAccessService(),
     private readonly notificationsService: NotificationsService = new NotificationsService(),
   ) {}
 
@@ -122,7 +124,12 @@ export class MessagesService {
     if (!message)
       throw new NotFoundException("Message not found.");
 
-    await this.ensureChatAccess(userId, message.chatType, String(message.chatId));
+    await this.ensureChatAccess(
+      userId,
+      message.chatType,
+      String(message.chatId),
+      input.conversationUnlockToken,
+    );
 
     const existingReactionIndex = message.reactions.findIndex((reaction: MessageReaction) =>
       reaction.emoji === input.emoji && String(reaction.userId) === userId,
@@ -150,10 +157,10 @@ export class MessagesService {
 
   private async resolveAccessibleChat(
     userId: string,
-    input: Pick<ListMessagesInput, "channelId" | "conversationId">,
+    input: Pick<ListMessagesInput, "channelId" | "conversationId" | "conversationUnlockToken">,
   ): Promise<{ chatType: MessageChatType; chatId: string }> {
     const target = resolveMessageTarget(input);
-    await this.ensureChatAccess(userId, target.chatType, target.chatId);
+    await this.ensureChatAccess(userId, target.chatType, target.chatId, input.conversationUnlockToken);
 
     return target;
   }
@@ -162,6 +169,7 @@ export class MessagesService {
     userId: string,
     chatType: MessageChatType,
     chatId: string,
+    conversationUnlockToken?: string,
   ): Promise<void> {
     if (chatType === "channel") {
       const channel = await this.channelsRepository.findById(chatId);
@@ -185,6 +193,17 @@ export class MessagesService {
 
     if (!isParticipant)
       throw new ForbiddenException("You do not have access to this conversation.");
+
+    if (conversation.pinProtected) {
+      const isUnlocked = this.protectedConversationAccessService.validateAccessToken({
+        conversationId: conversation.id,
+        token: conversationUnlockToken,
+        userId,
+      });
+
+      if (!isUnlocked)
+        throw new ForbiddenException("PIN verification required for this conversation.");
+    }
   }
 
   private async buildMessageResponses(messages: MessageDocument[]): Promise<MessageResponse[]> {

@@ -15,6 +15,10 @@ export class ConversationsRepository {
     return ConversationModel.findById(conversationId).exec();
   }
 
+  findByIdWithAccessPin(conversationId: string) {
+    return ConversationModel.findById(conversationId).select("+accessPinHash").exec();
+  }
+
   findByParticipantKey(participantKey: string) {
     return ConversationModel.findOne({ participantKey }).exec();
   }

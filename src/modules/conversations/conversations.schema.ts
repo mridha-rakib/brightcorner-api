@@ -20,3 +20,12 @@ export const createDirectConversationSchema = z.object({
     pin: z.string().trim().regex(/^\d{4}$/, "PIN must be exactly 4 digits.").optional(),
   }),
 });
+
+export const unlockProtectedConversationSchema = z.object({
+  body: z.object({
+    pin: z.string().trim().regex(/^\d{4}$/, "PIN must be exactly 4 digits."),
+  }),
+  params: z.object({
+    conversationId: objectIdSchema,
+  }),
+});

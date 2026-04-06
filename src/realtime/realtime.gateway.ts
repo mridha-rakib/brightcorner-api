@@ -10,8 +10,10 @@ import type { PublicUser } from "@/modules/users/users.type.js";
 import { AUTH_CONSTANTS } from "@/common/auth/auth.constants.js";
 import { TokenService } from "@/common/auth/token.service.js";
 import { env } from "@/env.js";
+import { ProtectedConversationAccessService } from "@/modules/conversations/protected-conversation-access.service.js";
 import { ChannelsRepository } from "@/modules/channels/channels.repository.js";
 import { ConversationsRepository } from "@/modules/conversations/conversations.repository.js";
+import { ConversationsService } from "@/modules/conversations/conversations.service.js";
 import { UsersRepository } from "@/modules/users/users.repository.js";
 import { toPublicUser } from "@/modules/users/users.utils.js";
 import { logger } from "@/utils/logger.js";
@@ -25,6 +27,7 @@ type RealtimeSocket = Socket & {
 type TypingPayload = {
   chatId: string;
   chatType: MessageChatType;
+  unlockToken?: string;
 };
 
 type CallSignalPayload = {
@@ -72,12 +75,15 @@ export class RealtimeGateway {
   private io: Server | null = null;
   private readonly presenceByUserId = new Map<string, Set<string>>();
   private readonly activeCalls = new Map<string, ActiveCall>();
+  private readonly unlockedProtectedConversationsBySocketId = new Map<string, Map<string, string>>();
 
   constructor(
     private readonly tokenService: TokenService = new TokenService(),
     private readonly usersRepository: UsersRepository = new UsersRepository(),
     private readonly conversationsRepository: ConversationsRepository = new ConversationsRepository(),
+    private readonly conversationsService: ConversationsService = new ConversationsService(),
     private readonly channelsRepository: ChannelsRepository = new ChannelsRepository(),
+    private readonly protectedConversationAccessService: ProtectedConversationAccessService = new ProtectedConversationAccessService(),
   ) {}
 
   initialize(server: HttpServer): void {
@@ -116,11 +122,30 @@ export class RealtimeGateway {
     this.io = null;
     this.presenceByUserId.clear();
     this.activeCalls.clear();
+    this.unlockedProtectedConversationsBySocketId.clear();
   }
 
   async broadcastMessageCreated(message: MessageResponse): Promise<void> {
     if (!this.io)
       return;
+
+    if (message.chatType === "conversation") {
+      const conversation = await this.conversationsRepository.findById(message.chatId);
+      if (!conversation)
+        return;
+
+      const participantIds = conversation.participantIds.map(
+        (participantId: (typeof conversation.participantIds)[number]) => String(participantId),
+      ) as [string, string];
+
+      if (conversation.pinProtected)
+        this.emitProtectedConversationMessageCreated(message.chatId, message, participantIds);
+      else
+        this.emitToUsers(participantIds, "message:created", message);
+
+      await this.broadcastConversationSummaryUpdated(message.chatId, participantIds);
+      return;
+    }
 
     const audienceUserIds = await this.resolveChatAudience(message.chatType, message.chatId);
     this.emitToUsers(audienceUserIds, "message:created", message);
@@ -129,6 +154,22 @@ export class RealtimeGateway {
   async broadcastMessageUpdated(message: MessageResponse): Promise<void> {
     if (!this.io)
       return;
+
+    if (message.chatType === "conversation") {
+      const conversation = await this.conversationsRepository.findById(message.chatId);
+      if (!conversation)
+        return;
+
+      const participantIds = conversation.participantIds.map(
+        (participantId: (typeof conversation.participantIds)[number]) => String(participantId),
+      ) as [string, string];
+
+      if (conversation.pinProtected) {
+        this.emitProtectedConversationMessageUpdated(message.chatId, message, participantIds);
+        await this.broadcastConversationSummaryUpdated(message.chatId, participantIds);
+        return;
+      }
+    }
 
     const audienceUserIds = await this.resolveChatAudience(message.chatType, message.chatId);
     this.emitToUsers(audienceUserIds, "message:updated", message);
@@ -190,8 +231,16 @@ export class RealtimeGateway {
       void this.handleTypingEvent(socket, payload, false);
     });
 
-    socket.on("call:start", (payload: { conversationId: string }) => {
-      void this.handleCallStart(socket, payload.conversationId);
+    socket.on("conversation:unlock", (payload: { conversationId: string; unlockToken: string }) => {
+      void this.handleConversationUnlock(socket, payload);
+    });
+
+    socket.on("conversation:lock", (payload: { conversationId: string }) => {
+      this.handleConversationLock(socket, payload.conversationId);
+    });
+
+    socket.on("call:start", (payload: { conversationId: string; unlockToken?: string }) => {
+      void this.handleCallStart(socket, payload.conversationId, payload.unlockToken);
     });
 
     socket.on("call:accept", (payload: { callId: string }) => {
@@ -220,6 +269,36 @@ export class RealtimeGateway {
     payload: TypingPayload,
     isTyping: boolean,
   ): Promise<void> {
+    if (payload.chatType === "conversation") {
+      const conversation = await this.resolveProtectedConversationAccess(
+        socket,
+        payload.chatId,
+        payload.unlockToken,
+      );
+      if (conversation === null)
+        return;
+
+      if (conversation?.pinProtected) {
+        const recipientSocketIds = this.getSocketIdsForConversationParticipants(
+          conversation.id,
+          socket.data.user.id,
+        ).filter(socketId => this.isConversationUnlockedForSocket(socketId, conversation.id));
+
+        if (recipientSocketIds.length === 0)
+          return;
+
+        for (const recipientSocketId of recipientSocketIds) {
+          this.emitToSocket(recipientSocketId, "typing:update", {
+            chatId: payload.chatId,
+            chatType: payload.chatType,
+            isTyping,
+            user: socket.data.user,
+          });
+        }
+        return;
+      }
+    }
+
     const audienceUserIds = await this.resolveChatAudience(
       payload.chatType,
       payload.chatId,
@@ -241,14 +320,29 @@ export class RealtimeGateway {
     );
   }
 
-  private async handleCallStart(socket: RealtimeSocket, conversationId: string): Promise<void> {
+  private async handleCallStart(
+    socket: RealtimeSocket,
+    conversationId: string,
+    unlockToken?: string,
+  ): Promise<void> {
     const { user } = socket.data;
-    const conversation = await this.conversationsRepository.findById(conversationId);
-
-    if (!conversation) {
+    const existingConversation = await this.conversationsRepository.findById(conversationId);
+    if (!existingConversation) {
       socket.emit("call:error", { message: "Conversation not found." });
       return;
     }
+
+    const conversation = existingConversation.pinProtected
+      ? await this.resolveProtectedConversationAccess(
+          socket,
+          conversationId,
+          unlockToken,
+          { emitErrorOnFailure: true },
+        )
+      : existingConversation;
+
+    if (!conversation)
+      return;
 
     const participantIds = conversation.participantIds.map(
       (participantId: (typeof conversation.participantIds)[number]) => String(participantId),
@@ -256,6 +350,18 @@ export class RealtimeGateway {
     if (!participantIds.includes(user.id)) {
       socket.emit("call:error", { message: "You do not have access to this conversation." });
       return;
+    }
+
+    if (conversation.pinProtected) {
+      const recipientSocketIds = this.getSocketIdsForConversationParticipants(conversation.id, user.id)
+        .filter(socketId => this.isConversationUnlockedForSocket(socketId, conversation.id));
+
+      if (recipientSocketIds.length === 0) {
+        socket.emit("call:error", {
+          message: "The other participant must unlock this conversation before joining a call.",
+        });
+        return;
+      }
     }
 
     const recipientUserId = participantIds.find(participantId => participantId !== user.id);
@@ -299,6 +405,21 @@ export class RealtimeGateway {
       initiatedAt: activeCall.initiatedAt,
       participant: recipientUser,
     });
+
+    if (conversation.pinProtected) {
+      for (const recipientSocketId of this.getSocketIdsForConversationParticipants(conversation.id, user.id)) {
+        if (!this.isConversationUnlockedForSocket(recipientSocketId, conversation.id))
+          continue;
+
+        this.emitToSocket(recipientSocketId, "call:incoming", {
+          callId,
+          conversationId,
+          initiatedAt: activeCall.initiatedAt,
+          participant: user,
+        });
+      }
+      return;
+    }
 
     this.emitToUser(recipientUserId, "call:incoming", {
       callId,
@@ -379,6 +500,7 @@ export class RealtimeGateway {
   private handleDisconnect(socket: RealtimeSocket): void {
     const { user } = socket.data;
     const isStillOnline = this.markUserOffline(user.id, socket.id);
+    this.unlockedProtectedConversationsBySocketId.delete(socket.id);
 
     if (isStillOnline)
       return;
@@ -442,9 +564,44 @@ export class RealtimeGateway {
     this.io?.to(userRoom(userId)).emit(event, payload);
   }
 
+  private emitToSocket(socketId: string, event: string, payload: unknown): void {
+    this.io?.to(socketId).emit(event, payload);
+  }
+
   private emitToUsers(userIds: string[], event: string, payload: unknown): void {
     for (const userId of [...new Set(userIds)])
       this.emitToUser(userId, event, payload);
+  }
+
+  private async handleConversationUnlock(
+    socket: RealtimeSocket,
+    payload: { conversationId: string; unlockToken: string },
+  ): Promise<void> {
+    const conversation = await this.resolveProtectedConversationAccess(
+      socket,
+      payload.conversationId,
+      payload.unlockToken,
+      { emitErrorOnFailure: true },
+    );
+
+    if (!conversation || !conversation.pinProtected)
+      return;
+
+    const unlockedConversations = this.unlockedProtectedConversationsBySocketId.get(socket.id) ?? new Map<string, string>();
+    unlockedConversations.set(conversation.id, payload.unlockToken);
+    this.unlockedProtectedConversationsBySocketId.set(socket.id, unlockedConversations);
+  }
+
+  private handleConversationLock(socket: RealtimeSocket, conversationId: string): void {
+    const unlockedConversations = this.unlockedProtectedConversationsBySocketId.get(socket.id);
+    if (!unlockedConversations)
+      return;
+
+    unlockedConversations.delete(conversationId);
+    if (unlockedConversations.size === 0)
+      this.unlockedProtectedConversationsBySocketId.delete(socket.id);
+    else
+      this.unlockedProtectedConversationsBySocketId.set(socket.id, unlockedConversations);
   }
 
   private async resolveChatAudience(
@@ -473,6 +630,157 @@ export class RealtimeGateway {
       return [];
 
     return memberUserIds;
+  }
+
+  private async resolveProtectedConversationAccess(
+    socket: RealtimeSocket,
+    conversationId: string,
+    unlockToken?: string,
+    options?: { emitErrorOnFailure?: boolean },
+  ) {
+    const conversation = await this.conversationsRepository.findById(conversationId);
+    if (!conversation)
+      return null;
+
+    const isParticipant = conversation.participantIds
+      .map((participantId: (typeof conversation.participantIds)[number]) => String(participantId))
+      .includes(socket.data.user.id);
+
+    if (!isParticipant)
+      return null;
+
+    if (!conversation.pinProtected)
+      return conversation;
+
+    const token = unlockToken ?? this.getConversationUnlockTokenForSocket(socket.id, conversation.id);
+    const isUnlocked = this.protectedConversationAccessService.validateAccessToken({
+      conversationId: conversation.id,
+      token,
+      userId: socket.data.user.id,
+    });
+
+    if (!isUnlocked) {
+      if (options?.emitErrorOnFailure) {
+        socket.emit("conversation:error", {
+          conversationId,
+          message: "PIN verification required for this conversation.",
+        });
+      }
+      return null;
+    }
+
+    const unlockedConversations = this.unlockedProtectedConversationsBySocketId.get(socket.id) ?? new Map<string, string>();
+    unlockedConversations.set(conversation.id, token!);
+    this.unlockedProtectedConversationsBySocketId.set(socket.id, unlockedConversations);
+
+    return conversation;
+  }
+
+  private emitProtectedConversationMessageCreated(
+    conversationId: string,
+    message: MessageResponse,
+    participantIds: [string, string],
+  ): void {
+    for (const participantId of participantIds) {
+      for (const socketId of this.getSocketIdsForUser(participantId)) {
+        if (!this.isConversationUnlockedForSocket(socketId, conversationId))
+          continue;
+
+        this.emitToSocket(socketId, "message:created", message);
+      }
+    }
+  }
+
+  private emitProtectedConversationMessageUpdated(
+    conversationId: string,
+    message: MessageResponse,
+    participantIds: [string, string],
+  ): void {
+    for (const participantId of participantIds) {
+      for (const socketId of this.getSocketIdsForUser(participantId)) {
+        if (!this.isConversationUnlockedForSocket(socketId, conversationId))
+          continue;
+
+        this.emitToSocket(socketId, "message:updated", message);
+      }
+    }
+  }
+
+  private async broadcastConversationSummaryUpdated(
+    conversationId: string,
+    participantIds: [string, string],
+  ): Promise<void> {
+    for (const participantId of participantIds) {
+      for (const socketId of this.getSocketIdsForUser(participantId)) {
+        const unlockToken = this.getConversationUnlockTokenForSocket(socketId, conversationId);
+        const summary = await this.conversationsService.getConversationById(
+          participantId,
+          conversationId,
+          unlockToken,
+        ).catch(() => null);
+
+        if (!summary)
+          continue;
+
+        this.emitToSocket(socketId, "chat:summary-updated", summary);
+      }
+    }
+  }
+
+  private getSocketIdsForConversationParticipants(
+    conversationId: string,
+    requestingUserId?: string,
+  ): string[] {
+    const conversationSockets = new Set<string>();
+
+    for (const [userId, socketIds] of this.presenceByUserId.entries()) {
+      if (requestingUserId && userId === requestingUserId)
+        continue;
+
+      for (const socketId of socketIds) {
+        const unlockToken = this.getConversationUnlockTokenForSocket(socketId, conversationId);
+        if (!unlockToken)
+          continue;
+
+        conversationSockets.add(socketId);
+      }
+    }
+
+    return [...conversationSockets];
+  }
+
+  private getSocketIdsForUser(userId: string): string[] {
+    return [...(this.presenceByUserId.get(userId) ?? new Set<string>())];
+  }
+
+  private getConversationUnlockTokenForSocket(
+    socketId: string,
+    conversationId: string,
+  ): string | undefined {
+    const token = this.unlockedProtectedConversationsBySocketId.get(socketId)?.get(conversationId);
+    if (!token)
+      return undefined;
+
+    const socket = this.io?.sockets.sockets.get(socketId) as RealtimeSocket | undefined;
+    if (!socket)
+      return undefined;
+
+    const isValid = this.protectedConversationAccessService.validateAccessToken({
+      conversationId,
+      token,
+      userId: socket.data.user.id,
+    });
+
+    if (!isValid) {
+      this.handleConversationLock(socket, conversationId);
+      return undefined;
+    }
+
+    return token;
+  }
+
+  private isConversationUnlockedForSocket(socketId: string, conversationId: string): boolean {
+    return Boolean(this.getConversationUnlockTokenForSocket(socketId, conversationId));
   }
 }
 

@@ -17,6 +17,8 @@ class ConversationsRouter {
 
     this.router.get("/", this.controller.listConversations);
     this.router.post("/direct", this.controller.createDirectConversation);
+    this.router.post("/:conversationId/unlock", this.controller.unlockProtectedConversation);
+    this.router.post("/:conversationId/lock", this.controller.lockProtectedConversation);
     this.router.get("/:conversationId", this.controller.getConversationById);
   }
 }
