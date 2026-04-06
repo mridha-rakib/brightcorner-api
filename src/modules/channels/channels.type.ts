@@ -4,6 +4,7 @@ export type ChannelPrivacy = "public" | "private";
 export type ChannelJoinStatus = "joined" | "not_joined" | "pending";
 export type ChannelMembershipRole = "owner" | "admin" | "member";
 export type ChannelJoinRequestStatus = "pending" | "approved" | "rejected";
+export type ChannelJoinRequestReviewAction = "approve" | "reject";
 
 export type ChannelQuestion = {
   questionId: string;
@@ -31,6 +32,7 @@ export type ChannelMembership = {
   channelId: Types.ObjectId;
   userId: Types.ObjectId;
   role: ChannelMembershipRole;
+  subscribed: boolean;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -54,6 +56,8 @@ export type ChannelSummary = {
   isPublic: boolean;
   isEncrypted: true;
   joinStatus: ChannelJoinStatus;
+  isSubscribed: boolean;
+  unread: number;
   members: number;
   totalAdmins: number;
   online: number;
@@ -82,6 +86,17 @@ export type ChannelMember = {
       avatarUrl?: string;
     };
   };
+};
+
+export type ChannelJoinRequestResponse = {
+  id: string;
+  channelId: string;
+  answers: ChannelJoinAnswer[];
+  reason?: string;
+  status: ChannelJoinRequestStatus;
+  createdAt: Date;
+  updatedAt: Date;
+  requester: ChannelMember["user"];
 };
 
 export type ChannelDocument = HydratedDocument<Channel>;

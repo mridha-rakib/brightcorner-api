@@ -51,7 +51,9 @@ export class UsersRepository extends BaseRepository<User> {
       : { "profile.username": normalizeUsername(normalizedIdentifier) };
 
     const query = this.model.findOne(filter);
-    return includePasswordHash ? query.select("+passwordHash").exec() : query.exec();
+    return includePasswordHash
+      ? query.select("+passwordHash +twoFactorCodeHash +twoFactorCodeExpiresAt +twoFactorLastSentAt").exec()
+      : query.exec();
   }
 
   async isEmailTaken(email: string, excludeUserId?: string): Promise<boolean> {

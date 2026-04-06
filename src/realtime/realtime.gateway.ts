@@ -1,5 +1,8 @@
-import { randomUUID } from "node:crypto";
 import type { Server as HttpServer } from "node:http";
+import type { Socket } from "socket.io";
+
+import { randomUUID } from "node:crypto";
+import { Server } from "socket.io";
 
 import type { MessageChatType, MessageResponse } from "@/modules/messages/messages.type.js";
 import type { PublicUser } from "@/modules/users/users.type.js";
@@ -12,7 +15,6 @@ import { ConversationsRepository } from "@/modules/conversations/conversations.r
 import { UsersRepository } from "@/modules/users/users.repository.js";
 import { toPublicUser } from "@/modules/users/users.utils.js";
 import { logger } from "@/utils/logger.js";
-import { Server, type Socket } from "socket.io";
 
 type RealtimeSocket = Socket & {
   data: {
@@ -122,6 +124,14 @@ export class RealtimeGateway {
 
     const audienceUserIds = await this.resolveChatAudience(message.chatType, message.chatId);
     this.emitToUsers(audienceUserIds, "message:created", message);
+  }
+
+  async broadcastMessageUpdated(message: MessageResponse): Promise<void> {
+    if (!this.io)
+      return;
+
+    const audienceUserIds = await this.resolveChatAudience(message.chatType, message.chatId);
+    this.emitToUsers(audienceUserIds, "message:updated", message);
   }
 
   private async authenticateSocket(socket: Socket): Promise<PublicUser> {

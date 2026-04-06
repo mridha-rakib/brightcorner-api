@@ -1,51 +1,85 @@
-import type { CreateMessageInput, ListMessagesInput } from "@/modules/messages/messages.interface.js";
+import type {
+  CreateMessageInput,
+  ListMessagesInput,
+  MarkChatReadInput,
+  ToggleMessageReactionInput,
+} from "@/modules/messages/messages.interface.js";
 import type {
   MessageChatType,
   MessageDocument,
+  MessageListResponse,
+  MessageReaction,
   MessageResponse,
 } from "@/modules/messages/messages.type.js";
 import type { PublicUser } from "@/modules/users/users.type.js";
 
 import { ChannelsRepository } from "@/modules/channels/channels.repository.js";
 import { ConversationsRepository } from "@/modules/conversations/conversations.repository.js";
+import { MessageReadStateRepository } from "@/modules/messages/message-read-state.repository.js";
 import { MessagesRepository } from "@/modules/messages/messages.repository.js";
-import { resolveMessageTarget, toMessageResponse } from "@/modules/messages/messages.utils.js";
+import {
+  resolveMessageTarget,
+  toMessageReplyReference,
+  toMessageResponse,
+} from "@/modules/messages/messages.utils.js";
 import { NotificationsService } from "@/modules/notifications/notifications.service.js";
 import { UsersRepository } from "@/modules/users/users.repository.js";
 import { toPublicUser } from "@/modules/users/users.utils.js";
-import { ForbiddenException, NotFoundException } from "@/utils/app-error.utils.js";
+import {
+  BadRequestException,
+  ForbiddenException,
+  NotFoundException,
+} from "@/utils/app-error.utils.js";
 
 export class MessagesService {
   constructor(
     private readonly messagesRepository: MessagesRepository = new MessagesRepository(),
+    private readonly messageReadStateRepository: MessageReadStateRepository = new MessageReadStateRepository(),
     private readonly usersRepository: UsersRepository = new UsersRepository(),
     private readonly channelsRepository: ChannelsRepository = new ChannelsRepository(),
     private readonly conversationsRepository: ConversationsRepository = new ConversationsRepository(),
     private readonly notificationsService: NotificationsService = new NotificationsService(),
   ) {}
 
-  async listMessages(userId: string, input: ListMessagesInput): Promise<MessageResponse[]> {
+  async listMessages(userId: string, input: ListMessagesInput): Promise<MessageListResponse> {
     const chat = await this.resolveAccessibleChat(userId, input);
-    const messages = await this.messagesRepository.listMessages({
+    const limit = input.limit ?? 40;
+    const messagePage = await this.messagesRepository.listMessagesPage({
+      beforeMessageId: input.beforeMessageId,
       chatType: chat.chatType,
       chatId: chat.chatId,
+      limit,
       pinnedOnly: input.pinnedOnly,
     });
+    const nextCursor = messagePage.hasMore
+      ? messagePage.items[messagePage.items.length - 1]?.id ?? null
+      : null;
 
-    return this.buildMessageResponses(messages);
+    return {
+      items: await this.buildMessageResponses([...messagePage.items].reverse()),
+      nextCursor,
+    };
   }
 
   async createMessage(userId: string, input: CreateMessageInput): Promise<MessageResponse> {
     const chat = await this.resolveAccessibleChat(userId, input);
-    const sender = await this.usersRepository.findActiveById(userId);
-    if (!sender)
-      throw new NotFoundException("User not found.");
+    if (input.replyToMessageId) {
+      const replyTarget = await this.messagesRepository.findById(input.replyToMessageId);
+      if (
+        !replyTarget
+        || replyTarget.chatType !== chat.chatType
+        || String(replyTarget.chatId) !== chat.chatId
+      ) {
+        throw new BadRequestException("Reply target must belong to the active chat.");
+      }
+    }
 
     const message = await this.messagesRepository.createMessage({
       attachments: input.attachments ?? [],
       chatType: chat.chatType,
       chatId: chat.chatId,
       pinned: input.pinned ?? false,
+      replyToMessageId: input.replyToMessageId,
       senderId: userId,
       text: input.text?.trim() ?? "",
     });
@@ -63,10 +97,55 @@ export class MessagesService {
       text: input.text?.trim() ?? "",
     });
 
-    return toMessageResponse({
-      message,
-      sender: toPublicUser(sender),
+    const [createdMessage] = await this.buildMessageResponses([message]);
+    if (!createdMessage)
+      throw new NotFoundException("Message sender not found.");
+
+    return createdMessage;
+  }
+
+  async markChatAsRead(userId: string, input: MarkChatReadInput): Promise<void> {
+    const chat = await this.resolveAccessibleChat(userId, input);
+
+    await this.messageReadStateRepository.upsertReadState({
+      chatId: chat.chatId,
+      chatType: chat.chatType,
+      userId,
     });
+  }
+
+  async toggleReaction(
+    userId: string,
+    input: ToggleMessageReactionInput,
+  ): Promise<MessageResponse> {
+    const message = await this.messagesRepository.findById(input.messageId);
+    if (!message)
+      throw new NotFoundException("Message not found.");
+
+    await this.ensureChatAccess(userId, message.chatType, String(message.chatId));
+
+    const existingReactionIndex = message.reactions.findIndex((reaction: MessageReaction) =>
+      reaction.emoji === input.emoji && String(reaction.userId) === userId,
+    );
+
+    if (existingReactionIndex >= 0) {
+      message.reactions.splice(existingReactionIndex, 1);
+    }
+    else {
+      message.reactions.push({
+        createdAt: new Date(),
+        emoji: input.emoji.trim(),
+        userId,
+      } as (typeof message.reactions)[number]);
+    }
+
+    await this.messagesRepository.save(message);
+
+    const [updatedMessage] = await this.buildMessageResponses([message]);
+    if (!updatedMessage)
+      throw new NotFoundException("Message sender not found.");
+
+    return updatedMessage;
   }
 
   private async resolveAccessibleChat(
@@ -74,20 +153,29 @@ export class MessagesService {
     input: Pick<ListMessagesInput, "channelId" | "conversationId">,
   ): Promise<{ chatType: MessageChatType; chatId: string }> {
     const target = resolveMessageTarget(input);
+    await this.ensureChatAccess(userId, target.chatType, target.chatId);
 
-    if (target.chatType === "channel") {
-      const channel = await this.channelsRepository.findById(target.chatId);
+    return target;
+  }
+
+  private async ensureChatAccess(
+    userId: string,
+    chatType: MessageChatType,
+    chatId: string,
+  ): Promise<void> {
+    if (chatType === "channel") {
+      const channel = await this.channelsRepository.findById(chatId);
       if (!channel)
         throw new NotFoundException("Channel not found.");
 
-      const membership = await this.channelsRepository.findMembership(target.chatId, userId);
+      const membership = await this.channelsRepository.findMembership(chatId, userId);
       if (!membership)
         throw new ForbiddenException("You must join this channel before accessing its messages.");
 
-      return target;
+      return;
     }
 
-    const conversation = await this.conversationsRepository.findById(target.chatId);
+    const conversation = await this.conversationsRepository.findById(chatId);
     if (!conversation)
       throw new NotFoundException("Conversation not found.");
 
@@ -97,12 +185,26 @@ export class MessagesService {
 
     if (!isParticipant)
       throw new ForbiddenException("You do not have access to this conversation.");
-
-    return target;
   }
 
   private async buildMessageResponses(messages: MessageDocument[]): Promise<MessageResponse[]> {
-    const senderIds = [...new Set(messages.map(message => String(message.senderId)))];
+    const replyMessageIds = [
+      ...new Set(
+        messages
+          .map(message => message.replyToMessageId ? String(message.replyToMessageId) : null)
+          .filter((messageId): messageId is string => Boolean(messageId)),
+      ),
+    ];
+    const replyMessages = await this.messagesRepository.findManyByIds(replyMessageIds);
+    const replyMessageMap = new Map<string, MessageDocument>(
+      replyMessages.map(replyMessage => [replyMessage.id, replyMessage]),
+    );
+    const senderIds = [
+      ...new Set([
+        ...messages.map(message => String(message.senderId)),
+        ...replyMessages.map(replyMessage => String(replyMessage.senderId)),
+      ]),
+    ];
     const senders = await this.usersRepository.findManyByIds(senderIds);
     const senderMap = new Map<string, PublicUser>(
       senders.map(sender => [sender.id, toPublicUser(sender)]),
@@ -114,8 +216,18 @@ export class MessagesService {
         if (!sender)
           return null;
 
+        const replyMessage = message.replyToMessageId
+          ? replyMessageMap.get(String(message.replyToMessageId))
+          : null;
+        const replySender = replyMessage
+          ? senderMap.get(String(replyMessage.senderId))
+          : null;
+
         return toMessageResponse({
           message,
+          replyTo: replyMessage && replySender
+            ? toMessageReplyReference(replyMessage, replySender)
+            : null,
           sender,
         });
       })

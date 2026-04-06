@@ -16,6 +16,7 @@ import {
   getOtherParticipantId,
   toConversationSummary,
 } from "@/modules/conversations/conversations.utils.js";
+import { MessageReadStateRepository } from "@/modules/messages/message-read-state.repository.js";
 import { MessagesRepository } from "@/modules/messages/messages.repository.js";
 import { resolveMessagePreview } from "@/modules/messages/messages.utils.js";
 import { UsersRepository } from "@/modules/users/users.repository.js";
@@ -27,6 +28,7 @@ export class ConversationsService {
     private readonly conversationsRepository: ConversationsRepository = new ConversationsRepository(),
     private readonly usersRepository: UsersRepository = new UsersRepository(),
     private readonly messagesRepository: MessagesRepository = new MessagesRepository(),
+    private readonly messageReadStateRepository: MessageReadStateRepository = new MessageReadStateRepository(),
     private readonly passwordService: PasswordService = new PasswordService(),
   ) {}
 
@@ -34,8 +36,16 @@ export class ConversationsService {
     userId: string,
     input: ListConversationsInput,
   ): Promise<ConversationSummary[]> {
-    const conversations = await this.conversationsRepository.listForUser(userId);
+    const [conversations, readStates] = await Promise.all([
+      this.conversationsRepository.listForUser(userId),
+      this.messageReadStateRepository.listForUser(userId),
+    ]);
     const participantMap = await this.buildParticipantMap(conversations, userId);
+    const readStateMap = new Map(
+      readStates
+        .filter(readState => readState.chatType === "conversation")
+        .map(readState => [String(readState.chatId), readState]),
+    );
 
     const visibleConversations = conversations.filter((conversation) => {
       if (!input.search)
@@ -61,7 +71,12 @@ export class ConversationsService {
         if (!participant)
           throw new NotFoundException("Conversation participant not found.");
 
-        return this.buildConversationSummary(conversation, participant);
+        return this.buildConversationSummary(
+          conversation,
+          participant,
+          userId,
+          readStateMap.get(conversation.id) ?? null,
+        );
       }),
     );
   }
@@ -106,11 +121,23 @@ export class ConversationsService {
   async getConversationById(userId: string, conversationId: string): Promise<ConversationDetail> {
     const conversation = await this.ensureConversationParticipant(userId, conversationId);
     const otherParticipantId = getOtherParticipantId(conversation, userId);
-    const participant = await this.usersRepository.findActiveById(otherParticipantId);
+    const [participant, readState] = await Promise.all([
+      this.usersRepository.findActiveById(otherParticipantId),
+      this.messageReadStateRepository.findByUserAndChat({
+        chatId: conversationId,
+        chatType: "conversation",
+        userId,
+      }),
+    ]);
     if (!participant)
       throw new NotFoundException("Conversation participant not found.");
 
-    return this.buildConversationSummary(conversation, toPublicUser(participant));
+    return this.buildConversationSummary(
+      conversation,
+      toPublicUser(participant),
+      userId,
+      readState,
+    );
   }
 
   async ensureConversationParticipant(
@@ -146,15 +173,26 @@ export class ConversationsService {
   private async buildConversationSummary(
     conversation: ConversationDocument,
     participant: PublicUser,
+    userId: string,
+    readState: Awaited<ReturnType<MessageReadStateRepository["listForUser"]>>[number] | null,
   ): Promise<ConversationSummary> {
-    const lastMessage = await this.messagesRepository.findLatestMessage({
-      chatType: "conversation",
-      chatId: conversation.id,
-    });
+    const [lastMessage, unread] = await Promise.all([
+      this.messagesRepository.findLatestMessage({
+        chatType: "conversation",
+        chatId: conversation.id,
+      }),
+      this.messagesRepository.countUnreadMessages({
+        chatId: conversation.id,
+        chatType: "conversation",
+        lastReadAt: readState?.lastReadAt ?? null,
+        userId,
+      }),
+    ]);
 
     return toConversationSummary({
       conversation,
       participant,
+      unread,
       lastMessage: resolveMessagePreview(lastMessage),
       lastMessageAt: lastMessage?.createdAt ?? null,
     });

@@ -14,3 +14,12 @@ export type SignInInput = {
   identifier: string;
   password: string;
 } & SessionMetadata;
+
+export type VerifySignInTwoFactorInput = {
+  challengeToken: string;
+  code: string;
+} & SessionMetadata;
+
+export type ResendSignInTwoFactorInput = {
+  challengeToken: string;
+};

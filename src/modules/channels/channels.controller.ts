@@ -7,6 +7,8 @@ import {
   createChannelSchema,
   createJoinRequestSchema,
   listChannelsSchema,
+  reviewJoinRequestSchema,
+  updateChannelSubscriptionSchema,
 } from "@/modules/channels/channels.schema.js";
 import { ChannelsService } from "@/modules/channels/channels.service.js";
 import { ApiResponse } from "@/utils/response.utils.js";
@@ -53,6 +55,54 @@ export class ChannelsController {
       payload.body,
     );
     ApiResponse.success(res, channel, "Join request submitted successfully.");
+  };
+
+  readonly listJoinRequests = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+    const payload = await zParse(channelParamsSchema, req);
+    const joinRequests = await this.channelsService.listJoinRequests(
+      req.user!.id,
+      payload.params.channelId,
+    );
+    ApiResponse.success(res, joinRequests, "Join requests fetched successfully.");
+  };
+
+  readonly reviewJoinRequest = async (
+    req: AuthenticatedRequest,
+    res: Response,
+  ): Promise<void> => {
+    const payload = await zParse(reviewJoinRequestSchema, req);
+    const joinRequest = await this.channelsService.reviewJoinRequest(
+      req.user!.id,
+      payload.params.channelId,
+      payload.params.requestId,
+      payload.body,
+    );
+    ApiResponse.success(
+      res,
+      joinRequest,
+      payload.body.action === "approve"
+        ? "Join request approved successfully."
+        : "Join request rejected successfully.",
+    );
+  };
+
+  readonly updateChannelSubscription = async (
+    req: AuthenticatedRequest,
+    res: Response,
+  ): Promise<void> => {
+    const payload = await zParse(updateChannelSubscriptionSchema, req);
+    const channel = await this.channelsService.updateChannelSubscription(
+      req.user!.id,
+      payload.params.channelId,
+      payload.body,
+    );
+    ApiResponse.success(
+      res,
+      channel,
+      payload.body.subscribed
+        ? "Channel subscription enabled successfully."
+        : "Channel subscription disabled successfully.",
+    );
   };
 
   readonly listMembers = async (req: AuthenticatedRequest, res: Response): Promise<void> => {

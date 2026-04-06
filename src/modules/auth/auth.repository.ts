@@ -20,10 +20,20 @@ export class AuthRepository {
     }).exec();
   }
 
-  async touchSession(sessionId: string): Promise<void> {
+  async touchSession(sessionId: string, expiresAt?: Date): Promise<void> {
+    const update: {
+      lastUsedAt: Date;
+      expiresAt?: Date;
+    } = {
+      lastUsedAt: new Date(),
+    };
+
+    if (expiresAt)
+      update.expiresAt = expiresAt;
+
     await AuthSessionModel.updateOne(
       { sessionId, revokedAt: null },
-      { $set: { lastUsedAt: new Date() } },
+      { $set: update },
     ).exec();
   }
 

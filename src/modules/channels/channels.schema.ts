@@ -44,3 +44,29 @@ export const createJoinRequestSchema = z.object({
     reason: z.string().trim().max(1000).optional(),
   }),
 });
+
+export const joinRequestParamsSchema = z.object({
+  params: z.object({
+    channelId: objectIdSchema,
+    requestId: objectIdSchema,
+  }),
+});
+
+export const reviewJoinRequestSchema = z.object({
+  params: z.object({
+    channelId: objectIdSchema,
+    requestId: objectIdSchema,
+  }),
+  body: z.object({
+    action: z.enum(["approve", "reject"]),
+  }),
+});
+
+export const updateChannelSubscriptionSchema = z.object({
+  params: z.object({
+    channelId: objectIdSchema,
+  }),
+  body: z.object({
+    subscribed: z.boolean(),
+  }),
+});

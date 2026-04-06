@@ -17,7 +17,9 @@ const messageTargetShape = {
 
 export const listMessagesSchema = z.object({
   query: z.object({
+    beforeMessageId: objectIdSchema.optional(),
     ...messageTargetShape,
+    limit: z.coerce.number().int().min(1).max(100).optional().default(40),
     pinnedOnly: z.coerce.boolean().optional(),
   }).refine(
     input => Number(Boolean(input.channelId)) + Number(Boolean(input.conversationId)) === 1,
@@ -32,6 +34,7 @@ export const createMessageSchema = z.object({
     ...messageTargetShape,
     attachments: z.array(attachmentSchema).max(4).optional().default([]),
     pinned: z.boolean().optional(),
+    replyToMessageId: objectIdSchema.optional(),
     text: z.string().trim().max(4000).optional().default(""),
   }).refine(
     input => Number(Boolean(input.channelId)) + Number(Boolean(input.conversationId)) === 1,
@@ -43,6 +46,26 @@ export const createMessageSchema = z.object({
     {
       error: "A message must include text or at least one attachment.",
       path: ["text"],
+    },
+  ),
+});
+
+export const toggleMessageReactionSchema = z.object({
+  body: z.object({
+    emoji: z.string().trim().min(1).max(16),
+  }),
+  params: z.object({
+    messageId: objectIdSchema,
+  }),
+});
+
+export const markChatReadSchema = z.object({
+  body: z.object({
+    ...messageTargetShape,
+  }).refine(
+    input => Number(Boolean(input.channelId)) + Number(Boolean(input.conversationId)) === 1,
+    {
+      error: "Provide either channelId or conversationId.",
     },
   ),
 });

@@ -10,6 +10,7 @@ import type {
 } from "@/modules/users/users.interface.js";
 import type { PublicUser, TwoFactorSettings, UserDocument } from "@/modules/users/users.type.js";
 
+import { AUTH_CONSTANTS } from "@/common/auth/auth.constants.js";
 import { PasswordService } from "@/common/auth/password.service.js";
 import { MailService } from "@/common/mail/mail.service.js";
 import { HTTPSTATUS } from "@/config/http.config.js";
@@ -231,13 +232,13 @@ export class UsersService {
     const now = Date.now();
     const lastSentAt = user.twoFactorLastSentAt?.getTime() ?? 0;
 
-    if (lastSentAt && now - lastSentAt < 30_000) {
+    if (lastSentAt && now - lastSentAt < AUTH_CONSTANTS.TWO_FACTOR_RESEND_COOLDOWN_MS) {
       throw new BadRequestException("Please wait a few seconds before requesting another code.");
     }
 
     const code = randomInt(100000, 1000000).toString();
     user.twoFactorCodeHash = this.hashTwoFactorCode(code);
-    user.twoFactorCodeExpiresAt = new Date(now + 10 * 60 * 1000);
+    user.twoFactorCodeExpiresAt = new Date(now + AUTH_CONSTANTS.TWO_FACTOR_CODE_TTL_MS);
     user.twoFactorLastSentAt = new Date(now);
     await user.save();
 

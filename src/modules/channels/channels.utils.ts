@@ -38,6 +38,7 @@ export function toChannelSummary(input: {
   channel: ChannelDocument;
   membership: ChannelMembershipDocument | null;
   joinRequest: ChannelJoinRequestDocument | null;
+  unread: number;
   members: number;
   totalAdmins: number;
   lastMessage: string | null;
@@ -52,6 +53,8 @@ export function toChannelSummary(input: {
     isPublic: input.channel.privacy === "public",
     isEncrypted: true,
     joinStatus: resolveChannelJoinStatus(input.membership, input.joinRequest),
+    isSubscribed: Boolean(input.membership?.subscribed),
+    unread: input.unread,
     members: input.members,
     totalAdmins: input.totalAdmins,
     online: 0,

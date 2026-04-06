@@ -1,6 +1,10 @@
 import mongoose, { model, Schema } from "mongoose";
 
-import type { Message, MessageAttachment } from "@/modules/messages/messages.type.js";
+import type {
+  Message,
+  MessageAttachment,
+  MessageReaction,
+} from "@/modules/messages/messages.type.js";
 
 const attachmentSchema = new Schema<MessageAttachment>({
   id: {
@@ -31,6 +35,29 @@ const attachmentSchema = new Schema<MessageAttachment>({
     required: true,
     trim: true,
     maxlength: 3_000_000,
+  },
+}, {
+  _id: false,
+  versionKey: false,
+});
+
+const reactionSchema = new Schema<MessageReaction>({
+  createdAt: {
+    type: Date,
+    required: true,
+    default: Date.now,
+  },
+  emoji: {
+    type: String,
+    required: true,
+    trim: true,
+    maxlength: 16,
+  },
+  userId: {
+    type: Schema.Types.ObjectId,
+    ref: "User",
+    required: true,
+    index: true,
   },
 }, {
   _id: false,
@@ -68,6 +95,16 @@ const messageSchema = new Schema<Message>({
   pinned: {
     type: Boolean,
     default: false,
+  },
+  reactions: {
+    type: [reactionSchema],
+    default: [],
+  },
+  replyToMessageId: {
+    type: Schema.Types.ObjectId,
+    ref: "Message",
+    default: null,
+    index: true,
   },
 }, {
   timestamps: true,

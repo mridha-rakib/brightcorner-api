@@ -6,9 +6,11 @@ import { AuthCookieService } from "@/common/auth/auth-cookie.service.js";
 import { AUTH_CONSTANTS } from "@/common/auth/auth.constants.js";
 import {
   forgotPasswordSchema,
+  resendSignInTwoFactorSchema,
   resetPasswordSchema,
   signInSchema,
   signUpSchema,
+  verifySignInTwoFactorSchema,
 } from "@/modules/auth/auth.schema.js";
 import { AuthService } from "@/modules/auth/auth.service.js";
 import { ApiResponse } from "@/utils/response.utils.js";
@@ -35,6 +37,38 @@ export class AuthController {
   readonly signIn = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
     const payload = await zParse(signInSchema, req);
     const result = await this.authService.signIn({
+      ...payload.body,
+      userAgent: req.get("user-agent"),
+      ipAddress: req.ip,
+    });
+
+    if (result.status === "two_factor_required") {
+      ApiResponse.success(res, result, "Two-factor verification required.");
+      return;
+    }
+
+    this.authCookieService.setAuthCookies(res, result.tokens);
+    ApiResponse.success(res, {
+      status: result.status,
+      user: result.user,
+    }, "Signed in successfully.");
+  };
+
+  readonly resendSignInTwoFactor = async (
+    req: AuthenticatedRequest,
+    res: Response,
+  ): Promise<void> => {
+    const payload = await zParse(resendSignInTwoFactorSchema, req);
+    const challenge = await this.authService.resendSignInTwoFactor(payload.body);
+    ApiResponse.success(res, challenge, "Verification code sent successfully.");
+  };
+
+  readonly verifySignInTwoFactor = async (
+    req: AuthenticatedRequest,
+    res: Response,
+  ): Promise<void> => {
+    const payload = await zParse(verifySignInTwoFactorSchema, req);
+    const result = await this.authService.verifySignInTwoFactor({
       ...payload.body,
       userAgent: req.get("user-agent"),
       ipAddress: req.ip,

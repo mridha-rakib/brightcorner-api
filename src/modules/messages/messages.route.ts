@@ -15,6 +15,8 @@ class MessagesRouter {
 
     this.router.get("/", this.controller.listMessages);
     this.router.post("/", this.controller.createMessage);
+    this.router.post("/read", this.controller.markChatRead);
+    this.router.post("/:messageId/reactions", this.controller.toggleReaction);
   }
 }
 

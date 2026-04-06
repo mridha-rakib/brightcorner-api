@@ -47,6 +47,7 @@ export class ChannelsRepository {
     channelId: string;
     userId: string;
     role: ChannelMembershipRole;
+    subscribed?: boolean;
   }) {
     return ChannelMembershipModel.create(payload);
   }
@@ -104,6 +105,20 @@ export class ChannelsRepository {
 
   findJoinRequestsForUser(userId: string) {
     return ChannelJoinRequestModel.find({ userId }).exec();
+  }
+
+  findJoinRequestById(channelId: string, requestId: string) {
+    return ChannelJoinRequestModel.findOne({ _id: requestId, channelId }).exec();
+  }
+
+  listPendingJoinRequests(channelId: string) {
+    return ChannelJoinRequestModel
+      .find({
+        channelId,
+        status: "pending",
+      })
+      .sort({ createdAt: 1 })
+      .exec();
   }
 
   async touchChannel(channelId: string): Promise<void> {

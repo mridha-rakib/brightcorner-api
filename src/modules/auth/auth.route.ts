@@ -13,6 +13,8 @@ class AuthRouter {
   private registerRoutes(): void {
     this.router.post("/sign-up", this.controller.signUp);
     this.router.post("/sign-in", this.controller.signIn);
+    this.router.post("/two-factor/resend", this.controller.resendSignInTwoFactor);
+    this.router.post("/two-factor/verify", this.controller.verifySignInTwoFactor);
     this.router.post("/refresh", this.controller.refresh);
     this.router.post("/sign-out", this.controller.signOut);
     this.router.post("/forgot-password", this.controller.forgotPassword);

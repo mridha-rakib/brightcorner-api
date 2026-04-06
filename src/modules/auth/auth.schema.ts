@@ -16,6 +16,19 @@ export const signInSchema = z.object({
   }),
 });
 
+export const verifySignInTwoFactorSchema = z.object({
+  body: z.object({
+    challengeToken: z.string().trim().min(1),
+    code: z.string().trim().regex(/^\d{6}$/, "Verification code must be 6 digits."),
+  }),
+});
+
+export const resendSignInTwoFactorSchema = z.object({
+  body: z.object({
+    challengeToken: z.string().trim().min(1),
+  }),
+});
+
 export const forgotPasswordSchema = z.object({
   body: z.object({
     email: z.string().trim().email(),

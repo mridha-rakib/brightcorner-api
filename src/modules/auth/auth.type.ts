@@ -29,5 +29,25 @@ export type AuthenticatedResult = {
   tokens: AuthTokens;
 };
 
+export type TwoFactorChallenge = {
+  requiresTwoFactor: true;
+  challengeToken: string;
+  deliveryLabel: string;
+  deliveryMethod: "email";
+  expiresAt: Date | null;
+  lastSentAt: Date | null;
+};
+
+export type SignInResult
+  = | {
+      status: "authenticated";
+      user: PublicUser;
+      tokens: AuthTokens;
+    }
+    | {
+      status: "two_factor_required";
+      challenge: TwoFactorChallenge;
+    };
+
 export type AuthSessionDocument = HydratedDocument<AuthSession>;
 export type PasswordResetTokenDocument = HydratedDocument<PasswordResetToken>;

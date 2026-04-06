@@ -15,6 +15,7 @@
     "start": "node --env-file=.env dist/index.js",
     "dev": "tsx watch --env-file=.env src/index.ts",
     "build": "tsc && tsc-alias",
+    "seed:admin": "tsx --env-file=.env src/scripts/seed-admin.ts",
     "lint": "eslint src test",
     "lint:fix": "eslint --fix src test",
     "test": "vitest run",

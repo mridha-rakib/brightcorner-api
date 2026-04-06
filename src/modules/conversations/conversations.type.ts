@@ -19,6 +19,7 @@ export type ConversationSummary = {
   avatarUrl?: string;
   isEncrypted: true;
   isPinProtected: boolean;
+  unread: number;
   lastMessage: string | null;
   lastMessageAt: Date | null;
   participant: PublicUser;

@@ -1,4 +1,8 @@
-import type { ChannelJoinAnswer, ChannelPrivacy } from "@/modules/channels/channels.type.js";
+import type {
+  ChannelJoinAnswer,
+  ChannelJoinRequestReviewAction,
+  ChannelPrivacy,
+} from "@/modules/channels/channels.type.js";
 
 export type CreateChannelInput = {
   name: string;
@@ -19,4 +23,12 @@ export type ListChannelsInput = {
 export type CreateJoinRequestInput = {
   answers?: ChannelJoinAnswer[];
   reason?: string;
+};
+
+export type ReviewJoinRequestInput = {
+  action: ChannelJoinRequestReviewAction;
+};
+
+export type UpdateChannelSubscriptionInput = {
+  subscribed: boolean;
 };

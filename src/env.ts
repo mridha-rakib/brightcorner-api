@@ -89,10 +89,20 @@ export const env = createEnv({
     SMTP_SECURE: z.stringbool().default(false),
     SMTP_USER: z.string().trim().min(1).optional(),
     SMTP_PASS: z.string().trim().min(1).optional(),
+    ADMIN_SEED_EMAIL: z.string().trim().email().optional(),
+    ADMIN_SEED_PASSWORD: z.string().min(8).optional(),
+    ADMIN_SEED_FIRST_NAME: z.string().trim().min(1).default("Blaise"),
+    ADMIN_SEED_LAST_NAME: z.string().trim().min(1).default("Temateh"),
   },
   runtimeEnv: getRuntimeEnv(),
   emptyStringAsUndefined: true,
 });
+
+if (Boolean(env.ADMIN_SEED_EMAIL) !== Boolean(env.ADMIN_SEED_PASSWORD)) {
+  throw new Error(
+    "ADMIN_SEED_EMAIL and ADMIN_SEED_PASSWORD must be provided together.",
+  );
+}
 
 if (env.EMAIL_PROVIDER === "smtp" && env.NODE_ENV === "production") {
   const missingSmtpKeys = [

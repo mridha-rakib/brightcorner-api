@@ -77,6 +77,10 @@ const channelMembershipSchema = new Schema<ChannelMembership>({
     enum: ["owner", "admin", "member"],
     default: "member",
   },
+  subscribed: {
+    type: Boolean,
+    default: false,
+  },
 }, {
   timestamps: true,
   versionKey: false,

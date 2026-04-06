@@ -25,6 +25,7 @@ export function getOtherParticipantId(
 export function toConversationSummary(input: {
   conversation: ConversationDocument;
   participant: PublicUser;
+  unread: number;
   lastMessage: string | null;
   lastMessageAt: Date | null;
 }): ConversationSummary {
@@ -35,6 +36,7 @@ export function toConversationSummary(input: {
     avatarUrl: input.participant.profile.avatarUrl,
     isEncrypted: true,
     isPinProtected: input.conversation.pinProtected,
+    unread: input.unread,
     lastMessage: input.lastMessage,
     lastMessageAt: input.lastMessageAt,
     participant: input.participant,
