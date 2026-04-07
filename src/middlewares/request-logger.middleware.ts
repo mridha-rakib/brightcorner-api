@@ -2,6 +2,7 @@ import type { NextFunction, Request, Response } from "express";
 
 import { randomUUID } from "node:crypto";
 
+import type { RequestWithContext } from "@/middlewares/request-context.types.js";
 import { logger, runWithRequestContext } from "@/utils/logger.js";
 
 type RequestLoggerOptions = {
@@ -47,10 +48,11 @@ export function createRequestLoggerMiddleware(
   const enableLogging = options.enableLogging ?? true;
 
   return (request: Request, response: Response, next: NextFunction): void => {
+    const requestWithContext = request as RequestWithContext;
     const requestId = resolveRequestId(request.headers["x-request-id"]);
 
-    request.id = requestId;
-    request.requestId = requestId;
+    requestWithContext.id = requestId;
+    requestWithContext.requestId = requestId;
     response.setHeader("X-Request-Id", requestId);
 
     const startTime = process.hrtime.bigint();

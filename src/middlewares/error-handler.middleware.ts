@@ -5,6 +5,7 @@ import { ZodError } from "zod/v4";
 import { HTTPSTATUS } from "@/config/http.config.js";
 import { ErrorCodeEnum } from "@/enums/error-code.enum.js";
 import { env } from "@/env.js";
+import type { RequestWithContext } from "@/middlewares/request-context.types.js";
 import { AppError } from "@/utils/app-error.utils.js";
 import { logger } from "@/utils/logger.js";
 
@@ -51,7 +52,8 @@ function buildErrorPayload(
   details?: unknown,
   stack?: string,
 ): ErrorPayload {
-  const requestId = req.requestId ?? req.id;
+  const requestWithContext = req as RequestWithContext;
+  const requestId = requestWithContext.requestId ?? requestWithContext.id;
 
   return {
     success: false,
@@ -74,13 +76,15 @@ export function errorHandler(
   res: Response,
   _next: NextFunction,
 ): void {
+  const requestWithContext = req as RequestWithContext;
+
   if (res.headersSent)
     return;
 
   if (isPayloadTooLargeError(err)) {
     logger.warn("Request payload too large", {
       path: req.originalUrl,
-      requestId: req.requestId,
+      requestId: requestWithContext.requestId,
       limit: err.limit,
       length: err.length,
     });
@@ -103,7 +107,7 @@ export function errorHandler(
   if (isInvalidRequestFormatError(err)) {
     logger.warn("Invalid request payload format", {
       path: req.originalUrl,
-      requestId: req.requestId,
+      requestId: requestWithContext.requestId,
       error: err.message,
     });
 
@@ -148,7 +152,7 @@ export function errorHandler(
       logger.error("Unhandled application error", {
         error: err,
         path: req.originalUrl,
-        requestId: req.requestId,
+        requestId: requestWithContext.requestId,
       });
     }
 
@@ -160,7 +164,7 @@ export function errorHandler(
   logger.error("Unhandled server error", {
     error: unknownError,
     path: req.originalUrl,
-    requestId: req.requestId,
+    requestId: requestWithContext.requestId,
   });
 
   const payload = buildErrorPayload(
