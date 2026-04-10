@@ -52,6 +52,7 @@ export function toChannelSummary(input: {
     iconUrl: input.channel.iconUrl,
     isPublic: input.channel.privacy === "public",
     isEncrypted: true,
+    membersCanMessage: input.channel.membersCanMessage,
     joinStatus: resolveChannelJoinStatus(input.membership, input.joinRequest),
     isSubscribed: Boolean(input.membership?.subscribed),
     unread: input.unread,

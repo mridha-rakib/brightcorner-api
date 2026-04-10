@@ -39,6 +39,10 @@ const channelSchema = new Schema<Channel>({
     required: true,
     enum: ["public", "private"],
   },
+  membersCanMessage: {
+    type: Boolean,
+    default: false,
+  },
   iconUrl: {
     type: String,
     trim: true,

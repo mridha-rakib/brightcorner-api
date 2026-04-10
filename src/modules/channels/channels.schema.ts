@@ -70,3 +70,12 @@ export const updateChannelSubscriptionSchema = z.object({
     subscribed: z.boolean(),
   }),
 });
+
+export const updateChannelMessagingPermissionsSchema = z.object({
+  params: z.object({
+    channelId: objectIdSchema,
+  }),
+  body: z.object({
+    membersCanMessage: z.boolean(),
+  }),
+});

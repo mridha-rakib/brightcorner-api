@@ -12,13 +12,13 @@ import type {
 import type { PublicUser } from "@/modules/users/users.type.js";
 
 import { PasswordService } from "@/common/auth/password.service.js";
-import { ProtectedConversationAccessService } from "@/modules/conversations/protected-conversation-access.service.js";
 import { ConversationsRepository } from "@/modules/conversations/conversations.repository.js";
 import {
   buildConversationParticipantKey,
   getOtherParticipantId,
   toConversationSummary,
 } from "@/modules/conversations/conversations.utils.js";
+import { ProtectedConversationAccessService } from "@/modules/conversations/protected-conversation-access.service.js";
 import { MessageReadStateRepository } from "@/modules/messages/message-read-state.repository.js";
 import { MessagesRepository } from "@/modules/messages/messages.repository.js";
 import { resolveMessagePreview } from "@/modules/messages/messages.utils.js";
@@ -75,12 +75,18 @@ export class ConversationsService {
         if (!participant)
           throw new NotFoundException("Conversation participant not found.");
 
+        const isUnlocked = this.isConversationUnlockedForUser(
+          conversation,
+          userId,
+          input.conversationUnlockToken,
+        );
+
         return this.buildConversationSummary(
           conversation,
           participant,
           userId,
           readStateMap.get(conversation.id) ?? null,
-          false,
+          isUnlocked,
         );
       }),
     );

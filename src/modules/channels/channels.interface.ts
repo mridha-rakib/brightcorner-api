@@ -32,3 +32,7 @@ export type ReviewJoinRequestInput = {
 export type UpdateChannelSubscriptionInput = {
   subscribed: boolean;
 };
+
+export type UpdateChannelMessagingPermissionsInput = {
+  membersCanMessage: boolean;
+};

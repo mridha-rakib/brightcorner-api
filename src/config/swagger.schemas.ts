@@ -313,6 +313,10 @@ export const swaggerComponents = {
         iconUrl: { type: "string", maxLength: 2048 },
         isPublic: { type: "boolean" },
         isEncrypted: { type: "boolean", enum: [true] },
+        membersCanMessage: {
+          type: "boolean",
+          description: "When false, only channel owners and admins can send messages.",
+        },
         joinStatus: { type: "string", enum: ["joined", "not_joined", "pending"] },
         isSubscribed: { type: "boolean" },
         unread: { type: "integer", minimum: 0 },
@@ -423,6 +427,16 @@ export const swaggerComponents = {
       type: "object",
       required: ["subscribed"],
       properties: { subscribed: { type: "boolean" } },
+    },
+    UpdateChannelMessagingPermissionsRequest: {
+      type: "object",
+      required: ["membersCanMessage"],
+      properties: {
+        membersCanMessage: {
+          type: "boolean",
+          description: "Turn on to allow all channel members to send messages.",
+        },
+      },
     },
     ConversationSummary: {
       type: "object",

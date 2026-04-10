@@ -14,8 +14,8 @@ import type {
 import type { PublicUser } from "@/modules/users/users.type.js";
 
 import { ChannelsRepository } from "@/modules/channels/channels.repository.js";
-import { ProtectedConversationAccessService } from "@/modules/conversations/protected-conversation-access.service.js";
 import { ConversationsRepository } from "@/modules/conversations/conversations.repository.js";
+import { ProtectedConversationAccessService } from "@/modules/conversations/protected-conversation-access.service.js";
 import { MessageReadStateRepository } from "@/modules/messages/message-read-state.repository.js";
 import { MessagesRepository } from "@/modules/messages/messages.repository.js";
 import {
@@ -64,7 +64,7 @@ export class MessagesService {
   }
 
   async createMessage(userId: string, input: CreateMessageInput): Promise<MessageResponse> {
-    const chat = await this.resolveAccessibleChat(userId, input);
+    const chat = await this.resolveAccessibleChat(userId, input, "write");
     if (input.replyToMessageId) {
       const replyTarget = await this.messagesRepository.findById(input.replyToMessageId);
       if (
@@ -158,9 +158,16 @@ export class MessagesService {
   private async resolveAccessibleChat(
     userId: string,
     input: Pick<ListMessagesInput, "channelId" | "conversationId" | "conversationUnlockToken">,
+    accessMode: "read" | "write" = "read",
   ): Promise<{ chatType: MessageChatType; chatId: string }> {
     const target = resolveMessageTarget(input);
-    await this.ensureChatAccess(userId, target.chatType, target.chatId, input.conversationUnlockToken);
+    await this.ensureChatAccess(
+      userId,
+      target.chatType,
+      target.chatId,
+      input.conversationUnlockToken,
+      accessMode,
+    );
 
     return target;
   }
@@ -170,6 +177,7 @@ export class MessagesService {
     chatType: MessageChatType,
     chatId: string,
     conversationUnlockToken?: string,
+    accessMode: "read" | "write" = "read",
   ): Promise<void> {
     if (chatType === "channel") {
       const channel = await this.channelsRepository.findById(chatId);
@@ -179,6 +187,14 @@ export class MessagesService {
       const membership = await this.channelsRepository.findMembership(chatId, userId);
       if (!membership)
         throw new ForbiddenException("You must join this channel before accessing its messages.");
+
+      if (
+        accessMode === "write"
+        && !channel.membersCanMessage
+        && !["owner", "admin"].includes(membership.role)
+      ) {
+        throw new ForbiddenException("Only channel owners and admins can send messages in this channel.");
+      }
 
       return;
     }

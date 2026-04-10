@@ -21,6 +21,7 @@ export type Channel = {
   name: string;
   description?: string;
   privacy: ChannelPrivacy;
+  membersCanMessage: boolean;
   iconUrl?: string;
   questions: ChannelQuestion[];
   createdBy: Types.ObjectId;
@@ -55,6 +56,7 @@ export type ChannelSummary = {
   iconUrl?: string;
   isPublic: boolean;
   isEncrypted: true;
+  membersCanMessage: boolean;
   joinStatus: ChannelJoinStatus;
   isSubscribed: boolean;
   unread: number;

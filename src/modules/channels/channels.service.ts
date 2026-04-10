@@ -3,6 +3,7 @@ import type {
   CreateJoinRequestInput,
   ListChannelsInput,
   ReviewJoinRequestInput,
+  UpdateChannelMessagingPermissionsInput,
   UpdateChannelSubscriptionInput,
 } from "@/modules/channels/channels.interface.js";
 import type {
@@ -14,6 +15,7 @@ import type {
   ChannelMembershipDocument,
   ChannelSummary,
 } from "@/modules/channels/channels.type.js";
+import type { UserDocument } from "@/modules/users/users.type.js";
 
 import { ChannelsRepository } from "@/modules/channels/channels.repository.js";
 import {
@@ -21,11 +23,10 @@ import {
   normalizeChannelName,
   toChannelSummary,
 } from "@/modules/channels/channels.utils.js";
-import { MessagesRepository } from "@/modules/messages/messages.repository.js";
 import { MessageReadStateRepository } from "@/modules/messages/message-read-state.repository.js";
+import { MessagesRepository } from "@/modules/messages/messages.repository.js";
 import { resolveMessagePreview } from "@/modules/messages/messages.utils.js";
 import { NotificationsService } from "@/modules/notifications/notifications.service.js";
-import type { UserDocument } from "@/modules/users/users.type.js";
 import { UsersRepository } from "@/modules/users/users.repository.js";
 import { toPublicUser } from "@/modules/users/users.utils.js";
 import {
@@ -322,6 +323,23 @@ export class ChannelsService {
     return this.getChannelById(userId, channelId);
   }
 
+  async updateChannelMessagingPermissions(
+    userId: string,
+    channelId: string,
+    input: UpdateChannelMessagingPermissionsInput,
+  ): Promise<ChannelDetail> {
+    await this.ensureChannelManager(userId, channelId);
+
+    const channel = await this.channelsRepository.updateMessagingPermissions(
+      channelId,
+      input.membersCanMessage,
+    );
+    if (!channel)
+      throw new NotFoundException("Channel not found.");
+
+    return this.getChannelById(userId, channelId);
+  }
+
   async ensureJoinedMembership(
     userId: string,
     channelId: string,
@@ -352,9 +370,17 @@ export class ChannelsService {
     userId: string,
     channelId: string,
   ): Promise<ChannelMembershipDocument> {
+    return this.ensureChannelManager(userId, channelId, "Only owners and admins can manage join requests.");
+  }
+
+  private async ensureChannelManager(
+    userId: string,
+    channelId: string,
+    forbiddenMessage = "Only owners and admins can manage this channel.",
+  ): Promise<ChannelMembershipDocument> {
     const membership = await this.ensureJoinedMembership(userId, channelId);
     if (!["owner", "admin"].includes(membership.role))
-      throw new ForbiddenException("Only owners and admins can manage join requests.");
+      throw new ForbiddenException(forbiddenMessage);
 
     return membership;
   }

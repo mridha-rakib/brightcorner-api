@@ -17,6 +17,7 @@ class ChannelsRouter {
     this.router.post("/", this.controller.createChannel);
     this.router.get("/:channelId", this.controller.getChannelById);
     this.router.post("/:channelId/join", this.controller.joinPublicChannel);
+    this.router.patch("/:channelId/messaging-permissions", this.controller.updateChannelMessagingPermissions);
     this.router.patch("/:channelId/subscription", this.controller.updateChannelSubscription);
     this.router.get("/:channelId/join-requests", this.controller.listJoinRequests);
     this.router.post("/:channelId/join-requests", this.controller.requestJoinPrivateChannel);

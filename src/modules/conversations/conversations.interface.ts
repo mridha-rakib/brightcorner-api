@@ -1,4 +1,5 @@
 export type ListConversationsInput = {
+  conversationUnlockToken?: string;
   search?: string;
 };
 

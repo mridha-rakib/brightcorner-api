@@ -124,4 +124,12 @@ export class ChannelsRepository {
   async touchChannel(channelId: string): Promise<void> {
     await ChannelModel.findByIdAndUpdate(channelId, { $set: { updatedAt: new Date() } }).exec();
   }
+
+  updateMessagingPermissions(channelId: string, membersCanMessage: boolean) {
+    return ChannelModel.findByIdAndUpdate(
+      channelId,
+      { $set: { membersCanMessage } },
+      { new: true, runValidators: true },
+    ).exec();
+  }
 }

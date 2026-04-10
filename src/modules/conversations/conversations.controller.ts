@@ -14,7 +14,7 @@ import { zParse } from "@/utils/validators.utils.js";
 
 function resolveConversationUnlockToken(req: AuthenticatedRequest): string | undefined {
   const headerValue = req.header("x-conversation-unlock-token")?.trim();
-  return headerValue ? headerValue : undefined;
+  return headerValue || undefined;
 }
 
 export class ConversationsController {
@@ -29,7 +29,10 @@ export class ConversationsController {
     const payload = await zParse(listConversationsSchema, req);
     const conversations = await this.conversationsService.listMyConversations(
       req.user!.id,
-      payload.query,
+      {
+        ...payload.query,
+        conversationUnlockToken: resolveConversationUnlockToken(req),
+      },
     );
     ApiResponse.success(res, conversations, "Conversations fetched successfully.");
   };

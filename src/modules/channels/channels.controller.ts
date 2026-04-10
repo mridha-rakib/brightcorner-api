@@ -8,6 +8,7 @@ import {
   createJoinRequestSchema,
   listChannelsSchema,
   reviewJoinRequestSchema,
+  updateChannelMessagingPermissionsSchema,
   updateChannelSubscriptionSchema,
 } from "@/modules/channels/channels.schema.js";
 import { ChannelsService } from "@/modules/channels/channels.service.js";
@@ -102,6 +103,25 @@ export class ChannelsController {
       payload.body.subscribed
         ? "Channel subscription enabled successfully."
         : "Channel subscription disabled successfully.",
+    );
+  };
+
+  readonly updateChannelMessagingPermissions = async (
+    req: AuthenticatedRequest,
+    res: Response,
+  ): Promise<void> => {
+    const payload = await zParse(updateChannelMessagingPermissionsSchema, req);
+    const channel = await this.channelsService.updateChannelMessagingPermissions(
+      req.user!.id,
+      payload.params.channelId,
+      payload.body,
+    );
+    ApiResponse.success(
+      res,
+      channel,
+      payload.body.membersCanMessage
+        ? "Channel members can now send messages."
+        : "Only channel owners and admins can now send messages.",
     );
   };
 

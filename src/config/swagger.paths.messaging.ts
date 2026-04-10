@@ -83,6 +83,21 @@ export const messagingSwaggerPaths = {
       },
     },
   },
+  "/channels/{channelId}/messaging-permissions": {
+    patch: {
+      tags: ["Channels"],
+      summary: "Allow or block normal members from sending channel messages",
+      security: secured,
+      parameters: [objectIdParam("channelId", "Channel ID")],
+      requestBody: body("#/components/schemas/UpdateChannelMessagingPermissionsRequest"),
+      responses: {
+        ...response("Channel messaging permissions updated", {
+          $ref: "#/components/schemas/ChannelDetail",
+        }),
+        ...errors(400, 401, 403, 404, 413, 429, 500),
+      },
+    },
+  },
   "/channels/{channelId}/join-requests": {
     get: {
       tags: ["Channels"],
