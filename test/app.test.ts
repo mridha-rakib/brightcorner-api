@@ -28,3 +28,17 @@ describe("GET unknown route", () => {
     expect(response.body.error.code).toBe("RESOURCE_NOT_FOUND");
   });
 });
+
+describe("GET /api-docs.json", () => {
+  it("responds with the OpenAPI specification", async () => {
+    const response = await request(app)
+      .get("/api-docs.json")
+      .set("Accept", "application/json")
+      .expect("Content-Type", /json/)
+      .expect(200);
+
+    expect(response.body.openapi).toBe("3.0.3");
+    expect(response.body.paths).toHaveProperty("/auth/sign-in");
+    expect(response.body.paths).toHaveProperty("/messages");
+  });
+});

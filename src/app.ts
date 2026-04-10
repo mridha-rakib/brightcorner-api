@@ -10,8 +10,8 @@ import { swaggerSpec, swaggerUi, swaggerUiOptions } from "@/config/swagger.confi
 import { env } from "@/env.js";
 import { errorHandler } from "@/middlewares/error-handler.middleware.js";
 import { notFound } from "@/middlewares/not-found.middleware.js";
-import { createRequestLoggerMiddleware } from "@/middlewares/request-logger.middleware.js";
 import { globalRateLimit } from "@/middlewares/rate-limit.middleware.js";
+import { createRequestLoggerMiddleware } from "@/middlewares/request-logger.middleware.js";
 import rootRouter from "@/routes/index.route.js";
 
 class ApplicationFactory {
@@ -92,6 +92,10 @@ class ApplicationFactory {
     });
 
     if (env.ENABLE_SWAGGER) {
+      this.app.get("/api-docs.json", (_req, res) => {
+        res.status(200).json(swaggerSpec);
+      });
+
       this.app.use(
         "/api-docs",
         swaggerUi.serve,
