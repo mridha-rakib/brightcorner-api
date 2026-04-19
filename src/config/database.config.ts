@@ -8,6 +8,15 @@ export type DatabaseConnector = {
   disconnect: () => Promise<void>;
 };
 
+function describeMongoTarget(uri: string): string {
+  const normalizedUri = uri.replace(/^mongodb(?:\+srv)?:\/\//, "");
+  const authority = normalizedUri.includes("@")
+    ? normalizedUri.split("@").at(-1) ?? normalizedUri
+    : normalizedUri;
+
+  return authority.split("/")[0] ?? "unknown";
+}
+
 export class MongoDatabaseConnector implements DatabaseConnector {
   async connect(): Promise<void> {
     if (mongoose.connection.readyState === 1) {
@@ -21,6 +30,7 @@ export class MongoDatabaseConnector implements DatabaseConnector {
 
     logger.info("MongoDB connection established", {
       databaseName: env.MONGO_DB_NAME,
+      connectionTarget: describeMongoTarget(env.MONGO_URI),
     });
   }
 
