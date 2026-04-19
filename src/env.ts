@@ -39,7 +39,7 @@ export const env = createEnv({
     URL_ENCODED_LIMIT: z.string().trim().default("10mb"),
     CORS_ORIGINS: z
       .string()
-      .default("http://localhost:3000,http://localhost:3001")
+      .default("http://localhost:3000,http://localhost:3001,http://localhost:3002")
       .transform(parseCsv),
     TRUST_PROXY: z.stringbool().default(false),
     RATE_LIMIT_WINDOW_MS: z.coerce
