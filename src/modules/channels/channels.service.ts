@@ -69,6 +69,10 @@ export class ChannelsService {
 
     const visibleChannels = channels.filter((channel) => {
       const membership = membershipMap.get(channel.id);
+      const isOwnedChannel = membership?.role === "owner" && String(channel.createdBy) === userId;
+
+      if (input.scope === "owned")
+        return isOwnedChannel;
 
       if (input.scope === "joined")
         return Boolean(membership);

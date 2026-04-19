@@ -58,6 +58,7 @@ export type ChannelSummary = {
   isEncrypted: true;
   membersCanMessage: boolean;
   joinStatus: ChannelJoinStatus;
+  membershipRole?: ChannelMembershipRole;
   isSubscribed: boolean;
   unread: number;
   members: number;

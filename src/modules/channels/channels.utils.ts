@@ -54,6 +54,7 @@ export function toChannelSummary(input: {
     isEncrypted: true,
     membersCanMessage: input.channel.membersCanMessage,
     joinStatus: resolveChannelJoinStatus(input.membership, input.joinRequest),
+    membershipRole: input.membership?.role,
     isSubscribed: Boolean(input.membership?.subscribed),
     unread: input.unread,
     members: input.members,

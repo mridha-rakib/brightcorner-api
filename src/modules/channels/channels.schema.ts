@@ -14,7 +14,7 @@ const joinAnswerSchema = z.object({
 
 export const listChannelsSchema = z.object({
   query: z.object({
-    scope: z.enum(["all", "joined", "discoverable"]).optional(),
+    scope: z.enum(["all", "joined", "discoverable", "owned"]).optional(),
     search: z.string().trim().optional(),
   }),
 });

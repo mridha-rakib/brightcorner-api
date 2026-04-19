@@ -1,16 +1,16 @@
 {
   "compilerOptions": {
     "target": "esnext",
+    "baseUrl": "./src",
+    "rootDir": "./src",
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
-    "rootDir": "./src",
-    "outDir": "./dist",
-    "baseUrl": "./src",
     "paths": {
       "@/*": ["./*"]
     },
     "strict": true,
     "noImplicitAny": true,
+    "outDir": "./dist",
     "sourceMap": true,
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,

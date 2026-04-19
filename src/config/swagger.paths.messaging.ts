@@ -21,7 +21,7 @@ export const messagingSwaggerPaths = {
           name: "scope",
           in: "query",
           required: false,
-          schema: { type: "string", enum: ["all", "joined", "discoverable"] },
+          schema: { type: "string", enum: ["all", "joined", "discoverable", "owned"] },
         },
         searchParam,
       ],

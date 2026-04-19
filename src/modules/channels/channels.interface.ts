@@ -16,7 +16,7 @@ export type CreateChannelInput = {
 };
 
 export type ListChannelsInput = {
-  scope?: "all" | "joined" | "discoverable";
+  scope?: "all" | "joined" | "discoverable" | "owned";
   search?: string;
 };
 

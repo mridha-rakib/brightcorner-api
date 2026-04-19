@@ -318,6 +318,11 @@ export const swaggerComponents = {
           description: "When false, only channel owners and admins can send messages.",
         },
         joinStatus: { type: "string", enum: ["joined", "not_joined", "pending"] },
+        membershipRole: {
+          type: "string",
+          enum: ["owner", "admin", "member"],
+          nullable: true,
+        },
         isSubscribed: { type: "boolean" },
         unread: { type: "integer", minimum: 0 },
         members: { type: "integer", minimum: 0 },
