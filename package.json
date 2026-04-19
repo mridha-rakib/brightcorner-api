@@ -12,9 +12,9 @@
   "type": "module",
   "main": "dist/index.js",
   "scripts": {
-    "start": "node --env-file=.env dist/index.js",
-    "dev": "tsx watch --env-file=.env src/index.ts",
-    "build": "tsc && tsc-alias",
+    "start": "node api.js && node --env-file=.env dist/index.js",
+    "dev": "node api.js && tsx watch --env-file=.env src/index.ts",
+    "build": "node api.js && tsc && tsc-alias",
     "seed:admin": "tsx --env-file=.env src/scripts/seed-admin.ts",
     "lint": "eslint src test",
     "lint:fix": "eslint --fix src test",
